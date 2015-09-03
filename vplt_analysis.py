@@ -356,8 +356,8 @@ def show_nlook_activity(data, tts, n, labels, pretime=-100, binsize=2,
     plt.show()
     return avgus, sus
 
-def comb_ci_saccimg(img_sus, xs_i, sacc_sus, xs_s, ipsicontra='contra', base=None,
-                    title='', figsize=(14, 5)):
+def comb_ci_saccimg(img_sus, xs_i, sacc_sus, xs_s, ipsicontra='contra', 
+                    base=None, title='', figsize=(14, 5), suptitle=''):
     f = plt.figure(figsize=figsize)
     ax_img = f.add_subplot(1, 2, 1)
     ax_sacc = f.add_subplot(1, 2, 2)
@@ -365,6 +365,7 @@ def comb_ci_saccimg(img_sus, xs_i, sacc_sus, xs_s, ipsicontra='contra', base=Non
                            title=title+' - imglock', ax=ax_img)
     show_contra_ipsi_suavg(sacc_sus, xs_s, ipsicontra=ipsicontra, base=base,
                            title=title+' - sacclock', ax=ax_sacc)
+    f.suptitle(suptitle)
     plt.show()
 
 def show_contra_ipsi_suavg(sus, xs, ipsicontra='contra', base=None, 
@@ -451,7 +452,32 @@ def plot_t1_t2_avg(novs, fams, xs, title='', ax=None):
     if ax is None:
         plt.show()
     return novs, fams
-    
+
+def extract_rowi(arrdict, i):
+    newd = {}
+    for k in arrdict.keys():
+        newd[k] = {}
+        for k2 in arrdict[k].keys():
+            newd[k][k2] = np.reshape(arrdict[k][k2][i, :], (1, -1))
+    return newd
+
+def comb_ci_sus_saccimg(img_sus, xs_i, sacc_sus, xs_s, inds=None, base=None,
+                        titlecontra='', titleipsi='', figsize=(14,5)):
+    if inds is None:
+        inds = np.arange(img_sus[img_sus.keys()[0]]['l'].shape[0])
+    titlecontra = titlecontra + ', contra'
+    titleipsi = titleipsi + ', ipsi'
+    for i in inds:
+        suptit = 'neuron {}'.format(i)
+        comb_ci_saccimg(extract_rowi(img_sus, i), xs_i, 
+                        extract_rowi(sacc_sus, i), xs_s, ipsicontra='contra',
+                        base=base, title=titlecontra, figsize=figsize, 
+                        suptitle=suptit)
+        comb_ci_saccimg(extract_rowi(img_sus, i), xs_i, 
+                        extract_rowi(sacc_sus, i), xs_s, ipsicontra='ipsi',
+                        base=base, title=titleipsi, figsize=figsize,
+                        suptitle=suptit)
+        
 def show_nov_fam_singles(sus, xs, inds=None, comp=None, title='', rec=None):
     if len(sus.keys()) == 4:
         novs = np.dstack((sus['7']['r'], sus['9']['l'], sus['9']['r'], 
