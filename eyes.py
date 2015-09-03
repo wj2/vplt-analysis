@@ -75,7 +75,7 @@ def show_sacc_latency_by_tnum(data, tnumrange, tbins):
     ax2.set_ylabel('probability looked at img first')
     ax2.set_xlabel('exp avg trial number')
 
-    plt.show(block=False)
+    plt.show()
     return f_on, f_no, f_fi
 
 def show_sacc_latency_dist(data, ttypes=None, postthr='fixation_off', bins=150, 
@@ -95,7 +95,7 @@ def show_sacc_latency_dist(data, ttypes=None, postthr='fixation_off', bins=150,
     ax.set_xlabel('ms from fixation to first saccade')
     ax.set_ylabel('count')
     ax.set_title('first saccade distribution')
-    plt.show(block=False)
+    plt.show()
     return all_fls
 
 def sacc_latency_by_tnum(data, tnumrange, tbins, ttypes=None,
@@ -155,37 +155,55 @@ def show_fixtime_dist(lens, cutoffmax=3000, bins=500):
                 histtype='step')
     ax.set_xlabel('fixation time (ms)')
     ax.set_ylabel('count')
-    plt.show(block=False)
+    plt.show()
 
-def get_fixtime_by_looknum(lens, maxlooks=15):
+def get_fixtime_by_looknum(lens, looks, uselooks, maxlooks=15):
     nlens = filter(lambda x: len(x) >= maxlooks, lens)
+    nlooks = filter(lambda x: len(x) >= maxlooks, looks)
     all_lens = np.zeros((len(nlens), maxlooks))
+    all_looks = np.zeros((len(nlens), maxlooks), dtype='str')
     for i, l in enumerate(nlens):
         all_lens[i, :] = l[:maxlooks]
-    m_lens = np.mean(all_lens, axis=0)
-    s_lens = np.std(all_lens, axis=0) / np.sqrt(all_lens.shape[0] - 1)
-    return m_lens, s_lens, all_lens
+        all_looks[i, :] = nlooks[i][:maxlooks]
+    m_lens, s_lens = {}, {}
+    for loo in uselooks:
+        m_lens[loo] = np.zeros(maxlooks)
+        s_lens[loo] = np.zeros(maxlooks)
+        for j in xrange(maxlooks):
+            corrlooks = all_looks[:, j] == loo
+            rellooks = all_lens[corrlooks, j]
+            m_lens[loo][j] = np.mean(rellooks)
+            s_lens[loo][j] = np.std(rellooks) / np.sqrt(rellooks.shape[0] - 1)
+    return m_lens, s_lens, all_lens, all_looks
 
-def show_fixtime_by_looknum(lens, maxlooks=15):
+def show_fixtime_by_looknum(lens, looks, uselooks=['l', 'r'], 
+                            usekeys=[7, 10], maxlooks=15):
     f = plt.figure()
     ax = f.add_subplot(1, 1, 1)
     xs = np.arange(1, maxlooks + 1)
-    for tt in lens.keys():
-        m_lens, s_lens, all_lens = get_fixtime_by_looknum(lens[tt], 
-                                                          maxlooks=maxlooks)
-        ax.errorbar(xs, m_lens, yerr=s_lens, label=tt)
-        ax.legend()
-    plt.show(block=False)
+    for tt in usekeys:
+        out = get_fixtime_by_looknum(lens[tt], looks[tt], uselooks, 
+                                     maxlooks=maxlooks)
+        m_lens, s_lens, all_lens, all_looks = out
+        for loo in uselooks:
+            ax.errorbar(xs, m_lens[loo], yerr=s_lens[loo], 
+                        label='{} {}'.format(tt, loo))
+    ax.legend()
+    plt.show()
     return m_lens, s_lens, all_lens
 
 def show_numlooks_dist(lens):
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
-    num_looks = map(lambda x: max(x.shape), lens)
-    ax.hist(num_looks, bins=np.arange(np.max(num_looks)+1))
+    for k in lens.keys():
+        klens = lens[k]
+        num_looks = map(lambda x: max(x.shape), klens)
+        ax.hist(num_looks, bins=np.arange(np.max(num_looks)+1), label=str(k),
+                normed=True, histtype='step')
     ax.set_xlabel('number of looks')
     ax.set_ylabel('count')
-    plt.show(block=False)
+    ax.legend()
+    plt.show()
 
 def get_look_probs(looks, n, countchar):
     sumlooks = np.zeros(n)
@@ -269,7 +287,7 @@ def show_compare_fix_lens(lens, looks, n=None, keyp=None, bins=200):
     ax.hist(n_looks, bins=bins, normed=True, histtype='step', label='nov')
     ax.hist(f_looks, bins=bins, normed=True, histtype='step', label='fam')
     ax.legend()
-    plt.show(block=False)
+    plt.show()
     return n_looks, n_trls, f_looks, f_trls
 
 def get_fixation_dests(sac_es, eyes, xleft, xright, yleft=0, yright=0, 
@@ -299,7 +317,7 @@ def plot_eyeloc(eyepos, skips=1, stdthr=1, filtwin=40, thr=None, save=False):
     ax2.legend(frameon=False)
     if save:
         f2.savefig('x-y-course.pdf')
-    plt.show(block=False)
+    plt.show()
 
 def get_starts(using, alllooks, n):
     sts = np.array(map(lambda x: x[1][n], alllooks[using]))

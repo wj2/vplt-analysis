@@ -44,30 +44,50 @@ def omega_squared(spkcounts, levelinds):
 
 def get_spikecourse(data, trial_type=None, pretime=-100, posttime=5000, 
                     binsize=2, timefield='fixation_off', ttfield='trial_type', 
-                    mantimes=None, spksfield='spike_times'):
+                    mantimes=None, spksfield='spike_times', excl_empty=False,
+                    smooth=False, step=5):
     if trial_type is not None:
         trls = data[data[ttfield] == trial_type]
         if mantimes is not None:
             mantimes = mantimes[data[ttfield] == trial_type]
     else:
         trls = data
-    nbins = np.ceil((posttime - pretime) / binsize)
+    if smooth:
+        nbins = np.ceil((posttime - pretime + binsize) / float(step))
+        posttime = posttime + binsize
+        filtwin = np.ones(binsize/step) / float(binsize)
+    else:
+        nbins = np.ceil((posttime - pretime) / binsize)
     numtrains = len(trls[spksfield])
     if len(trls[spksfield]) > 0:
         spkscoll = np.concatenate(trls[spksfield], axis=0)
     else:
         spkscoll = np.array([[]])
     numtrains = np.ones(spkscoll.shape[1])*len(trls[spksfield])
-    binspks = np.zeros((spkscoll.shape[1], nbins))
+    binspks = np.zeros((spkscoll.shape[1], nbins - (binsize/float(step)) + 1))
     if mantimes is None:
         centspks = spkscoll - np.reshape(trls[timefield], (-1, 1))
     else:
         centspks = spkscoll - mantimes
     trlbounds = (pretime, posttime)
     for i in xrange(centspks.shape[1]):
-        collectall = np.concatenate(centspks[:, i], axis=0)
-        binspks[i, :] = (binarize_spiketimes(collectall, binsize, trlbounds) 
-                         / float(centspks.shape[0]))
+        if excl_empty:
+            emfilt = filter(lambda x: len(x) > 0, centspks[:, i])
+            normfact = float(len(emfilt))
+            if len(emfilt) == 0:
+                collectall = np.array([])
+            else:
+                collectall = np.concatenate(emfilt, axis=0)
+        else:
+            normfact = float(centspks.shape[0])
+            collectall = np.concatenate(centspks[:, i], axis=0)
+        if smooth:
+            prefilt = binarize_spiketimes(collectall, step, trlbounds)
+            binspks[i, :] = np.convolve(prefilt, filtwin, mode='valid')
+        else:
+            binspks[i, :] = binarize_spiketimes(collectall, binsize, trlbounds)
+        if normfact > 0:
+            binspks[i, :] = binspks[i, :] / normfact
     return binspks, numtrains
 
 def get_varexpcourse(data, pretime=-200, posttime=5000, width=50, step=5.,
@@ -134,17 +154,17 @@ def get_nlook_timedir(data, n, eyefield='eyepos', postfix='fixation_off',
     return lds, lts
 
 def get_nsacc_activity(data, n, tts, labels, pretime=-100,
-                       binsize=2, timefield='fixation_off', imgon=0,
+                       binsize=50, step=5, timefield='fixation_off', imgon=0,
                        imgoff=5000, drunfield='datanum', tlim=300, 
                        eyefield='eyepos', lloc=-3, rloc=3, stimoff=3,
-                       ttfield='trial_type'):
+                       ttfield='trial_type', slock=True, excl_empty=True,
+                       spksfield='spike_times'):
     druns = get_data_run_nums(data, drunfield)
     sunits = {}
     avgunits = {}
+    xs = np.arange(pretime + binsize/2., tlim + binsize/2. + step, step)
     for i, t in enumerate(tts):
         ttrials = data[data[ttfield] == t]
-        l_wgts = []
-        r_wgts = []
         for j, dr in enumerate(druns):
             srun = ttrials[ttrials[drunfield] == dr]
             eps = srun[eyefield]
@@ -160,28 +180,59 @@ def get_nsacc_activity(data, n, tts, labels, pretime=-100,
             rruns = srun[ruse]
             lstarts = np.reshape(map(lambda x: x[n], t_s_bs[t][luse]), (-1, 1))
             rstarts = np.reshape(map(lambda x: x[n], t_s_bs[t][ruse]), (-1, 1))
-            lspks, lwg = get_spikecourse(lruns, pretime=pretime, posttime=tlim, 
-                                         binsize=binsize, mantimes=lstarts)
-            rspks, rwg = get_spikecourse(rruns, pretime=pretime, posttime=tlim, 
-                                         binsize=binsize, mantimes=rstarts)
-            l_wgts = np.concatenate((l_wgts, lwg))
-            r_wgts = np.concatenate((r_wgts, rwg))
+            if not (lstarts.shape[0] == 0 or rstarts.shape[0] == 0):
+                if slock:
+                    mantimes_l = lstarts
+                    mantimes_r = rstarts
+                else:
+                    mantimes_l = None
+                    mantimes_r = None
+                lspks, lwg = get_spikecourse(lruns, pretime=pretime, 
+                                             posttime=tlim, binsize=binsize, 
+                                             mantimes=mantimes_l, 
+                                             excl_empty=excl_empty, 
+                                             smooth=True, step=step)
+                rspks, rwg = get_spikecourse(rruns, pretime=pretime, 
+                                             posttime=tlim, binsize=binsize, 
+                                             mantimes=mantimes_r, 
+                                             excl_empty=excl_empty, 
+                                             smooth=True, step=step)
+                n_neurs = rspks.shape[0]
+            else:
+                n_neurs = srun[0][spksfield].shape[1]
+                t_pts = np.ceil((tlim - pretime) / float(step) + 1)
+                lspks = np.zeros((n_neurs, t_pts))
+                lspks[:, :] = np.nan
+                rspks = np.zeros((n_neurs, t_pts))
+                rspks[:, :] = np.nan
+                lwg = np.zeros(n_neurs)
+                rwg = np.zeros(n_neurs)
+            neur_record = np.zeros((n_neurs, 2))
+            neur_record[:, 0] = dr
+            neur_record[:, 1] = np.arange(n_neurs) + 1
             if j == 0:
                 alllspks = lspks
                 allrspks = rspks
+                l_wgts = lwg
+                r_wgts = rwg
+                all_neur_record = neur_record
             else:
                 alllspks = np.concatenate((alllspks, lspks), axis=0)
                 allrspks = np.concatenate((allrspks, rspks), axis=0)
+                l_wgts = np.concatenate((l_wgts, lwg))
+                r_wgts = np.concatenate((r_wgts, rwg))
+                all_neur_record = np.concatenate((all_neur_record, 
+                                                  neur_record), axis=0)
         l = labels[i]
         sunits[l] = {}
-        sunits[l]['l'] = alllspks*(1000. / binsize)
-        sunits[l]['r'] = allrspks*(1000. / binsize)
+        sunits[l]['l'] = alllspks*1000.
+        sunits[l]['r'] = allrspks*1000.
         avgunits[l] = {}
         avgunits[l]['l'] = np.average(sunits[l]['l'], axis=0, 
                                       weights=l_wgts > 0)
         avgunits[l]['r'] = np.average(sunits[l]['r'], axis=0, 
                                       weights=r_wgts > 0)
-    return avgunits, sunits
+    return avgunits, sunits, xs, all_neur_record
 
 def show_nsacc_activity(data, tts, n, labels, pretime=-100, binsize=2, 
                         timefield='fixation_off', imgon=0, imgoff=5000, 
@@ -216,7 +267,7 @@ def show_nsacc_activity(data, tts, n, labels, pretime=-100, binsize=2,
         suax_r = show_single_units(sus[k]['r'], pretime=pretime, posttime=tlim,
                                    binsize=binsize, ax=suax_r)
         suax_r.set_ylabel('units (r)')
-    plt.show(block=False)
+    plt.show()
     return avgus, sus
 
 def get_nlook_activity(data, n, tts, labels, pretime=-100,
@@ -302,23 +353,140 @@ def show_nlook_activity(data, tts, n, labels, pretime=-100, binsize=2,
         suax_r = show_single_units(sus[k]['r'], pretime=pretime, posttime=tlim,
                                    binsize=binsize, ax=suax_r)
         suax_r.set_ylabel('units (r)')
-    plt.show(block=False)
+    plt.show()
     return avgus, sus
 
-def show_nov_fam_suavg(sus, pretime, tlim, binsz):
-    xs = np.arange(pretime, tlim, binsz) + binsz/2.
-    novs = np.concatenate((sus['7']['r'], sus['9']['l'], sus['9']['r'], 
-                           sus['10']['l']), axis=0)
-    fams = np.concatenate((sus['7']['l'], sus['8']['l'], sus['8']['r'], 
-                           sus['10']['r']), axis=0)
+def show_contra_ipsi_suavg(sus, xs, ipsicontra='contra', base=None, 
+                           title=''):
+    if base == 'fam':
+        if ipsicontra == 'contra':
+            novs = sus['10']['l']
+            fams = sus['8']['l']
+        elif ipsicontra == 'ipsi':
+            novs = sus['7']['r']
+            fams = sus['8']['r']
+    elif base == 'all':
+        if ipsicontra == 'contra':
+            novs = np.concatenate((sus['10']['l'], sus['9']['l']), axis=0)
+            fams = np.concatenate((sus['8']['l'], sus['7']['l']), axis=0)
+        elif ipsicontra == 'ipsi':
+            novs = np.concatenate((sus['7']['r'], sus['9']['r']), axis=0)
+            fams = np.concatenate((sus['8']['r'], sus['10']['r']), axis=0)
+    elif base == 'same':
+        if ipsicontra == 'contra':
+            novs = sus['9']['l']
+            fams = sus['8']['l']
+        elif ipsicontra == 'ipsi':
+            novs = sus['9']['r']
+            fams = sus['8']['r']
+    elif base == 'nov':
+        if ipsicontra == 'contra':
+            novs = sus['9']['l']
+            fams = sus['7']['l']
+        elif ipsicontra == 'ipsi':
+            novs = sus['9']['r']
+            fams = sus['10']['r']
+    elif base == 'off_nov':
+        if ipsicontra == 'contra':
+            novs = sus['9']['l']
+            fams = sus['10']['l']
+        elif ipsicontra == 'ipsi':
+            novs = sus['9']['r']
+            fams = sus['7']['r']
+    elif base == 'off_fam':
+        if ipsicontra == 'contra':
+            novs = sus['7']['l']
+            fams = sus['8']['l']
+        elif ipsicontra == 'ipsi':
+            novs = sus['10']['r']
+            fams = sus['8']['r']
+    else:
+        if ipsicontra == 'contra':
+            novs = sus['10']['l']
+            fams = sus['7']['l']
+        elif ipsicontra == 'ipsi':
+            novs = sus['7']['r']
+            fams = sus['10']['r']
+    return show_nov_fam_suavg(sus, xs, title=title, novs=novs, fams=fams)    
+
+def show_nov_fam_suavg(sus, xs, title='', usekeys=['7', '10'], novs=None, 
+                       fams=None, comp=None):
+    if novs is None or fams is None:
+        if len(usekeys) == 4:
+            novs = np.concatenate((sus['7']['r'], sus['9']['l'], sus['9']['r'],
+                                   sus['10']['l']), axis=0)
+            fams = np.concatenate((sus['7']['l'], sus['8']['l'], sus['8']['r'], 
+                                   sus['10']['r']), axis=0)
+        elif len(usekeys) == 2:
+            novs = np.concatenate((sus['7']['r'], sus['10']['l']), axis=0)
+            fams = np.concatenate((sus['7']['l'], sus['10']['r']), axis=0)
+        elif len(usekeys) == 1:
+            if usekeys[0] == '7':
+                novs = sus['7']['r']
+                fams = sus['7']['l']
+            elif usekeys[0] == '10':
+                novs = sus['10']['l']
+                fams = sus['10']['r']
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    ax.plot(xs, novs.mean(0), label='nov')
-    ax.plot(xs, fams.mean(0), label='fam')
+    ax.plot(xs, np.nanmean(fams, axis=0), label='fam')
+    ax.plot(xs, np.nanmean(novs, axis=0), label='nov')
+    ax.set_xlabel('time (ms)')
+    ax.set_ylabel('firing rate (spks/s)')
+    ax.set_title(title)
     ax.legend()
-    plt.show(block=False)
+    plt.show()
     return novs, fams
     
+def show_nov_fam_singles(sus, xs, inds=None, comp=None, title='', rec=None):
+    if len(sus.keys()) == 4:
+        novs = np.dstack((sus['7']['r'], sus['9']['l'], sus['9']['r'], 
+                               sus['10']['l']))
+        fams = np.dstack((sus['7']['l'], sus['8']['l'], sus['8']['r'], 
+                               sus['10']['r']))
+        if comp is not None:
+            comp_novs = np.dstack((comp['7']['r'], comp['9']['l'], 
+                                   comp['9']['r'], comp['10']['l']))
+            comp_fams = np.dstack((comp['7']['l'], comp['8']['l'], 
+                                   comp['8']['r'], comp['10']['r']))
+    elif len(sus.keys()) == 2:
+        novs = np.dstack((sus['7']['r'], sus['10']['l']))
+        fams = np.dstack((sus['7']['l'], sus['10']['r']))
+        if comp is not None:
+            comp_novs = np.dstack((comp['7']['r'], comp['10']['l']))
+            comp_fams = np.dstack((comp['7']['l'], comp['10']['r']))
+    novs = np.mean(novs, axis=2)
+    fams = np.mean(fams, axis=2)
+    if comp is not None:
+        comp_novs = np.mean(comp_novs, axis=2)
+        comp_fams = np.mean(comp_fams, axis=2)
+    if inds is None:
+        a = sus.keys()[0]
+        b = sus[a].keys()[0]
+        inds = np.arange(sus[a][b].shape[0])
+    for i in inds:
+        f = plt.figure(figsize=(14, 5))
+        if comp is None:
+            ax = f.add_subplot(1, 1, 1)
+        else:
+            ax = f.add_subplot(1, 2, 1)
+        ax.plot(xs, fams[i, :], label='fam')
+        ax.plot(xs, novs[i, :], label='nov')
+        ax.set_xlabel('time (ms)')
+        ax.set_ylabel('firing rate (spks/s)')
+        if rec is not None:
+            neur_ident = 'run {}, sig {}'.format(rec[i, 0], rec[i, 1])
+        else:
+            neur_ident = 'neuron {}'.format(i)
+        ax.set_title('{} {}'.format(title, neur_ident))
+        ax.legend()
+        if comp is not None:
+            ax2 = f.add_subplot(1, 2, 2)
+            ax2.plot(xs, comp_fams[i, :], label='fam')
+            ax2.plot(xs, comp_novs[i, :], label='nov')
+            ax2.set_xlabel('time (ms)')
+    plt.show()
+
 def show_trialtype_spikecourse(data, tts, labels, pretime=-100, posttime=5000,
                                binsize=2, timefield='fixation_off', imgon=0, 
                                imgoff=5000, drunfield='datanum'):
@@ -349,7 +517,7 @@ def show_trialtype_spikecourse(data, tts, labels, pretime=-100, posttime=5000,
     ax.set_xlabel('ms')
     ax.set_ylabel('spks/s')
     ax.legend()
-    plt.show(block=False)
+    plt.show()
     return meantcs, alltcs
 
 def show_all_single_units(sudict, pretime=-100, posttime=5000, binsize=2, 
@@ -398,6 +566,6 @@ def show_separate_units(sus, pretime=-100, posttime=5000, binsize=2, xs=None,
             ax.set_yticks([minspk, maxspk])
             ax.set_xticks([])
         f.suptitle(k)
-    plt.show(block=False)
+    plt.show()
     return f
             

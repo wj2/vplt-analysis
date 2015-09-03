@@ -80,7 +80,7 @@ minImgOnCode = 56;
 maxImgOnCode = 180;
 imgOffCode = 55;
 for i = 1:length(data.BHV.TrialNumber)
-        
+    bhvgo = BHV.CodeTimes{i}(1);
     usei = i + bhv_offset;
     count = count + 1;  
     x(count).trial_type = BHV.ConditionNumber(usei);
@@ -89,15 +89,15 @@ for i = 1:length(data.BHV.TrialNumber)
     data.NEURO.CodeTimes <= trial_ends_ms(i));
     x(count).block_number = BHV.BlockNumber(usei);
     x(count).code_numbers = data.NEURO.CodeNumbers(trial_start_ind(i):trial_end_ind(i)+2);
-    x(count).code_times = data.NEURO.CodeTimes(trial_start_ind(i):trial_end_ind(i)+2);
-    x(count).trial_starts = trial_starts_ms;
+    x(count).code_times = data.NEURO.CodeTimes(trial_start_ind(i):trial_end_ind(i)+2) - trial_starts_ms(i);
+    x(count).trial_starts = trial_starts_ms(i);
     x(count).datafile = data.BHV.DataFileName;
     x(count).datanum = data.BHV.DataNum;
     useOnCodes = (minImgOnCode <= data.BHV.CodeNumbers{usei} & ...
         data.BHV.CodeNumbers{usei} <= maxImgOnCode);
     useOffCodes = data.BHV.CodeNumbers{usei} == imgOffCode;
-    x(count).centimgon = data.BHV.CodeTimes{usei}(useOnCodes);
-    x(count).centimgoff = data.BHV.CodeTimes{usei}(useOffCodes);
+    x(count).centimgon = data.BHV.CodeTimes{usei}(useOnCodes) - bhvgo;
+    x(count).centimgoff = data.BHV.CodeTimes{usei}(useOffCodes) - bhvgo;
     x(count).trialnum = data.BHV.TrialNumber(i);
     
     if count > size(data.BHV.UserVars, 2)
@@ -118,7 +118,6 @@ for i = 1:length(data.BHV.TrialNumber)
         code_time = data.NEURO.CodeTimes(trial_inds(code_ind)) - trial_starts_ms(i);
         x(count).(fieldname) = code_time;
     end
-    bhvgo = BHV.CodeTimes{i}(1);
     x(count).eyepos = BHV.AnalogData{i}.EyeSignal(bhvgo:end, :);
     
     % extract spike times

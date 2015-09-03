@@ -10,7 +10,7 @@ monthdict = {'01':'Jan', '02':'Feb', '03':'Mar', '04':'Apr', '05':'May',
              '11':'Nov', '12':'Dec'}
 
 def load_data(path, varname='superx'):
-    data = sio.loadmat(path)
+    data = sio.loadmat(path, mat_dtype=True)
     return data[varname]
 
 def load_separate(paths, pattern=None, varname='x'):
@@ -90,4 +90,5 @@ def get_img_names(codes, famfolder='/Users/wjj/Dropbox/research/uc/freedman/'
                   'pref_looking/famimgs', if_ns=25, n_ns=50):
     f, n, i = gen_img_list(famfolder=famfolder, nov_n=n_ns, intfam_n=if_ns)
     all_imnames = np.array(f + n + i)
-    return all_imnames[codes - 1]
+    cs = (codes - 1).astype(np.int)
+    return all_imnames[cs]

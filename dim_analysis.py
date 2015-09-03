@@ -7,18 +7,19 @@ from utility import *
 
 def get_img_response(data, use_imgnames, pretime=-100, posttime=500, 
                      winsize=50, step=10, spksfield='spike_times', 
-                     onfield='centimgon', offfield='centimgoff', 
-                     drunfield='datanum', errfield='TrialError', deserr=0, 
-                     binsize=5, ttfield='trial_type', imgnumfield='image_nos',
+                     onfield='centimgon', drunfield='datanum', 
+                     errfield='TrialError', deserr=0, binsize=5, 
+                     ttfield='trial_type', imgnumfield='image_nos',
                      tbound=6):
     noerr_data = data[data[errfield] == deserr]
     ne_corrtr_data = noerr_data[noerr_data[ttfield] <= tbound]
     druns = get_data_run_nums(ne_corrtr_data, drunfield)
     m_sunits = {}
     s_sunits = {}
-    filtwin = np.ones(winsize/step) / winsize
-    xs = np.arange(pretime + (winsize/2.), posttime - (winsize/2.) + step, 
+    filtwin = np.ones(winsize/step) / float(winsize)
+    xs = np.arange(pretime + (winsize/2.), posttime + (winsize/2.) + step, 
                    step)
+    n_bs = np.ceil((posttime - pretime + winsize) / float(step))
     for i, dr in enumerate(druns):
         srun = ne_corrtr_data[ne_corrtr_data[drunfield] == dr]
         runims = {}
@@ -29,17 +30,16 @@ def get_img_response(data, use_imgnames, pretime=-100, posttime=500,
             tons = t[onfield][useims]
             for i, im in enumerate(tims[:, 0]):
                 on_t = tons[i]
-                rb, re = on_t + pretime, on_t + posttime
-                n_bs = np.ceil((re - rb) / float(step))[0]
+                rb, re = on_t + pretime, on_t + posttime + winsize
                 tneur = np.zeros((len(t[spksfield][0]), len(xs), 1))
                 for j, neur in enumerate(t[spksfield][0]):
                     if len(neur) == 0:
                         bigbin_spks = np.ones(len(xs))
                         bigbin_spks[:] = np.nan
                     else:
-                        spks, _ = np.histogram(neur, range=(rb, re), bins=n_bs)
+                        spks, a = np.histogram(neur, range=(rb, re), bins=n_bs)
                         bigbin_spks = np.convolve(spks, filtwin, mode='valid')
-                    tneur[j, :, 0] = bigbin_spks
+                    tneur[j, :, 0] = bigbin_spks*1000.
                 prevsee = runims.get(im, [])
                 if len(prevsee) == 0:
                     runims[im] = tneur
@@ -59,6 +59,17 @@ def get_img_response(data, use_imgnames, pretime=-100, posttime=500,
                 s_sunits[im] = np.concatenate((s_prevunits, s_cu), axis=0)
     return m_sunits, s_sunits, xs
 
+def show_avg_resp(m_units, xs):
+    f = plt.figure()
+    ax = f.add_subplot(1, 1, 1)
+    for i, k in enumerate(m_units.keys()):
+        if i == 0:
+            all_act = m_units[k]
+        else:
+            all_act = np.concatenate((all_act, m_units[k]), axis=0)        
+    ax.plot(xs, np.nanmean(all_act, axis=0))
+    plt.show(block=False)
+
 def show_single_unit_resp(m_units, xs, imgs, mean=False):
     f = plt.figure()
     n = np.ceil(np.sqrt(len(imgs)))
@@ -70,6 +81,20 @@ def show_single_unit_resp(m_units, xs, imgs, mean=False):
             ax.plot(xs, m_units[im].T)
         ax.set_title(im)
     plt.show(block=False)
+
+def show_single_unit_allimg(m_units, xs, imgs, uind=None, legend=False):
+    if uind is None:
+        uind = np.arange(m_units[m_units.keys()[0]].shape[0])
+    for i in uind:
+        f = plt.figure()
+        ax = f.add_subplot(1, 1, 1)
+        for img in imgs:
+            ax.plot(xs, m_units[img][i, :], label=img)
+        ax.set_xlabel('time (ms)')
+        ax.set_ylabel('spikes/s')
+        ax.set_title('neuron {}'.format(i))
+        if legend:
+            ax.legend()        
 
 def show_likelihoods(imlikelies, xs, target=None, legend=False):
     f = plt.figure()
