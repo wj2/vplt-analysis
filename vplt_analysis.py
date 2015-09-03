@@ -356,8 +356,19 @@ def show_nlook_activity(data, tts, n, labels, pretime=-100, binsize=2,
     plt.show()
     return avgus, sus
 
+def comb_ci_saccimg(img_sus, xs_i, sacc_sus, xs_s, ipsicontra='contra', base=None,
+                    title='', figsize=(14, 5)):
+    f = plt.figure(figsize=figsize)
+    ax_img = f.add_subplot(1, 2, 1)
+    ax_sacc = f.add_subplot(1, 2, 2)
+    show_contra_ipsi_suavg(img_sus, xs_i, ipsicontra=ipsicontra, base=base, 
+                           title=title+' - imglock', ax=ax_img)
+    show_contra_ipsi_suavg(sacc_sus, xs_s, ipsicontra=ipsicontra, base=base,
+                           title=title+' - sacclock', ax=ax_sacc)
+    plt.show()
+
 def show_contra_ipsi_suavg(sus, xs, ipsicontra='contra', base=None, 
-                           title=''):
+                           title='', ax=None):
     if base == 'fam':
         if ipsicontra == 'contra':
             novs = sus['10']['l']
@@ -407,35 +418,38 @@ def show_contra_ipsi_suavg(sus, xs, ipsicontra='contra', base=None,
         elif ipsicontra == 'ipsi':
             novs = sus['7']['r']
             fams = sus['10']['r']
-    return show_nov_fam_suavg(sus, xs, title=title, novs=novs, fams=fams)    
+    return plot_t1_t2_avg(novs, fams, xs, title=title, ax=ax)
 
-def show_nov_fam_suavg(sus, xs, title='', usekeys=['7', '10'], novs=None, 
-                       fams=None, comp=None):
-    if novs is None or fams is None:
-        if len(usekeys) == 4:
-            novs = np.concatenate((sus['7']['r'], sus['9']['l'], sus['9']['r'],
-                                   sus['10']['l']), axis=0)
-            fams = np.concatenate((sus['7']['l'], sus['8']['l'], sus['8']['r'], 
-                                   sus['10']['r']), axis=0)
-        elif len(usekeys) == 2:
-            novs = np.concatenate((sus['7']['r'], sus['10']['l']), axis=0)
-            fams = np.concatenate((sus['7']['l'], sus['10']['r']), axis=0)
-        elif len(usekeys) == 1:
-            if usekeys[0] == '7':
-                novs = sus['7']['r']
-                fams = sus['7']['l']
-            elif usekeys[0] == '10':
-                novs = sus['10']['l']
-                fams = sus['10']['r']
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
+def show_nov_fam_suavg(sus, xs, title='', usekeys=['7', '10'], ax=None):
+    if len(usekeys) == 4:
+        novs = np.concatenate((sus['7']['r'], sus['9']['l'], sus['9']['r'],
+                               sus['10']['l']), axis=0)
+        fams = np.concatenate((sus['7']['l'], sus['8']['l'], sus['8']['r'], 
+                               sus['10']['r']), axis=0)
+    elif len(usekeys) == 2:
+        novs = np.concatenate((sus['7']['r'], sus['10']['l']), axis=0)
+        fams = np.concatenate((sus['7']['l'], sus['10']['r']), axis=0)
+    elif len(usekeys) == 1:
+        if usekeys[0] == '7':
+            novs = sus['7']['r']
+            fams = sus['7']['l']
+        elif usekeys[0] == '10':
+            novs = sus['10']['l']
+            fams = sus['10']['r']
+    return plot_t1_t2_avg(novs, fams, xs, title=title, ax=ax)
+
+def plot_t1_t2_avg(novs, fams, xs, title='', ax=None):
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
     ax.plot(xs, np.nanmean(fams, axis=0), label='fam')
     ax.plot(xs, np.nanmean(novs, axis=0), label='nov')
     ax.set_xlabel('time (ms)')
     ax.set_ylabel('firing rate (spks/s)')
     ax.set_title(title)
     ax.legend()
-    plt.show()
+    if ax is None:
+        plt.show()
     return novs, fams
     
 def show_nov_fam_singles(sus, xs, inds=None, comp=None, title='', rec=None):
