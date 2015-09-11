@@ -458,7 +458,7 @@ def extract_rowi(arrdict, i):
     for k in arrdict.keys():
         newd[k] = {}
         for k2 in arrdict[k].keys():
-            newd[k][k2] = np.reshape(arrdict[k][k2][i, :], (1, -1))
+            newd[k][k2] = arrdict[k][k2][i, :]
     return newd
 
 def comb_ci_sus_saccimg(img_sus, xs_i, sacc_sus, xs_s, inds=None, base=None,
@@ -469,12 +469,12 @@ def comb_ci_sus_saccimg(img_sus, xs_i, sacc_sus, xs_s, inds=None, base=None,
     titleipsi = titleipsi + ', ipsi'
     for i in inds:
         suptit = 'neuron {}'.format(i)
-        comb_ci_saccimg(extract_rowi(img_sus, i), xs_i, 
-                        extract_rowi(sacc_sus, i), xs_s, ipsicontra='contra',
+        comb_ci_saccimg(extract_rowi(img_sus, [i]), xs_i, 
+                        extract_rowi(sacc_sus, [i]), xs_s, ipsicontra='contra',
                         base=base, title=titlecontra, figsize=figsize, 
                         suptitle=suptit)
-        comb_ci_saccimg(extract_rowi(img_sus, i), xs_i, 
-                        extract_rowi(sacc_sus, i), xs_s, ipsicontra='ipsi',
+        comb_ci_saccimg(extract_rowi(img_sus, [i]), xs_i, 
+                        extract_rowi(sacc_sus, [i]), xs_s, ipsicontra='ipsi',
                         base=base, title=titleipsi, figsize=figsize,
                         suptitle=suptit)
         
