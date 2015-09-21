@@ -92,3 +92,4 @@ def get_img_names(codes, famfolder='/Users/wjj/Dropbox/research/uc/freedman/'
     all_imnames = np.array(f + n + i)
     cs = (codes - 1).astype(np.int)
     return all_imnames[cs]
+    
