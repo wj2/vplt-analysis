@@ -92,4 +92,35 @@ def get_img_names(codes, famfolder='/Users/wjj/Dropbox/research/uc/freedman/'
     all_imnames = np.array(f + n + i)
     cs = (codes - 1).astype(np.int)
     return all_imnames[cs]
+
+def get_cent_codes(tcodes, imgcodebeg=56, imgcodeend=180):
+    return tcodes[(tcodes >= imgcodebeg)*(tcodes <= imgcodeend)]
+
+def get_code_member(code, fambeg=56, famend=105, intbeg=106, intend=130, 
+                    novbeg=131, novend=180):
+    if novbeg <= code <= novend:
+        member = np.array([[1, 0, 0]])
+    elif intbeg <= code <= intend:
+        member = np.array([[0, 1, 0]])
+    elif fambeg <= code <= famend:
+        member = np.array([[0, 0, 1]])
+    return member
+
+def get_code_views(code, fambeg=56, famend=105, intbeg=106, intend=130, 
+                   novbeg=131, novend=180, novviews=25., intviews=450., 
+                   famviews=10000.):
+    memb = get_code_member(code, novbeg=novbeg, novend=novend, intbeg=intbeg, 
+                           intend=intend, fambeg=fambeg, famend=famend)
+    return np.sum(np.array([novviews, intviews, famviews])*memb)
+
+def views_to_member(views, novbeg=0, novend=200, intbeg=201, intend=1000, 
+                    fambeg=1001, famend=100000):
+    return get_code_member(views, novbeg=novbeg, novend=novend, intbeg=intbeg,
+                           intend=intend, fambeg=fambeg, famend=famend)
     
+def bins_tr(spks, beg, end, binsize, column=False, usetype=np.float):
+    bs = np.arange(beg, end + binsize, binsize)
+    spk_bs, _ = np.histogram(spks, bins=bs)
+    if column:
+        spk_bs = np.reshape(spk_bs, (-1, 1))
+    return spk_bs.astype(usetype)
