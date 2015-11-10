@@ -75,7 +75,7 @@ else:
                                     doc='off target novelty')
 
     # saccade probability growth constant
-    sacc_grow = pymc.Uniform('sacc_grow', lower=0, upper=5.,
+    sacc_grow = pymc.Uniform('sacc_grow', lower=0, upper=1.,
                              doc='saccade probability grow constant')
 
     # bias toward same-image saccade
