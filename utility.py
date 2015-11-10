@@ -124,3 +124,91 @@ def bins_tr(spks, beg, end, binsize, column=False, usetype=np.float):
     if column:
         spk_bs = np.reshape(spk_bs, (-1, 1))
     return spk_bs.astype(usetype)
+
+def get_neuron_spks_list(data, zerotimecode=8, drunfield='datanum', 
+                         spktimes='spike_times'):
+    undruns = get_data_run_nums(data, drunfield)
+    neurons = []
+    for i, dr in enumerate(undruns):
+        d = data[data[drunfield] == dr]
+        drneurs = []
+        for j, tr in enumerate(d):
+            t = get_code_time(tr, zerotimecode)
+            for k, spks in enumerate(tr[spktimes][0, :]):
+                if len(spks) > 0:
+                    tspks = spks - t
+                    if j == 0:
+                        drneurs.append([tspks])
+                    else:
+                        drneurs[k].append(tspks)
+                else:
+                    if j == 0:
+                        drneurs.append([])
+        neurons = neurons + drneurs
+    return neurons
+
+def euler_integrate(func, beg, end, step):
+    accumulate = 0
+    for t in np.arange(beg, end, step):
+        accumulate = accumulate + step*func(t)
+    return accumulate
+
+def evoked_st_cumdist(spkts, t, lam):
+    out = 1 - (1 - empirical_fs_cumdist(spkts, t))*np.exp(lam*t)
+    return out
+
+def empirical_fs_cumdist(spkts, t):
+    spk_before = lambda x: np.any(x < t) or (x.size == 0)
+    successes = np.sum(map(spk_before, spkts))
+    x = map(spk_before, spkts)
+    print successes / float(len(spkts))
+    return successes / float(len(spkts))
+
+def get_spks_window(dat, begwin, endwin):
+    makecut = lambda x: (np.sum(np.logical_and(begwin <= x, x <= endwin)) 
+                         / (endwin - begwin))
+    stuff = map(makecut, dat)
+    return stuff
+
+def get_code_time(trl, code, codenumfield='code_numbers', 
+                  codetimefield='code_times'):
+    ct = trl[codetimefield][trl[codenumfield] == code]
+    return ct
+
+def estimate_latency(neurspks, backgrd_window, latenwindow, integstep=.5):
+    bckgrd_spks = get_spks_window(neurspks, backgrd_window[0], 
+                                  backgrd_window[1])
+    bgd_est = np.mean(bckgrd_spks)
+    expect_func = lambda x: 1 - evoked_st_cumdist(neurspks, x, bgd_est)
+    est_lat = euler_integrate(expect_func, latenwindow[0], latenwindow[1], 
+                              integstep)
+    sm_func = lambda x: 2*x*(1 - evoked_st_cumdist(neurspks, x, bgd_est))
+    sm_latency = euler_integrate(sm_func, latenwindow[0], latenwindow[1], 
+                                 integstep)
+    est_std = np.sqrt(sm_latency - est_lat**2)
+    return est_lat, est_std
+
+def get_trls_with_neurnum(dat, neurnum, neurfield='spike_times', 
+                          drunfield='datanum'):
+    druns = get_data_run_nums(dat, drunfield)
+    count_neurs = 0
+    for i, dr in enumerate(druns):
+        drdat = dat[dat[drunfield] == dr]
+        new_neurs = drdat[0][neurfield].shape[1]
+        if count_neurs <= neurnum and new_neurs + count_neurs > neurnum:
+            neur_i = neurnum - count_neurs
+            for trls in drdat:
+                trls[neurfield] = trls[neurfield][:, [neur_i]]
+            keeptrls = drdat
+            return keeptrls
+        else:
+            count_neurs = count_neurs + new_neurs
+    raise Exception('only {} neurons in this dataset, which is less '
+                    'than {}'.format(count_neurs, neurnum))
+            
+def get_condnum_trls(dat, condnums, condnumfield='trial_type'):
+    keeps = np.zeros((dat.shape[0], len(condnums)))
+    for i, c in enumerate(condnums):
+        keeps[:, i] = dat[condnumfield] == c
+    flatkeep = np.sum(keeps, 1)
+    return dat[flatkeep > 0]

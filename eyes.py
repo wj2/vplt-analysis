@@ -78,6 +78,27 @@ def show_sacc_latency_by_tnum(data, tnumrange, tbins):
     plt.show()
     return f_on, f_no, f_fi
 
+def split_early_late(lens, dests, fbegs, early_thr):
+    early_lens, early_dests = {}, {}
+    late_lens, late_dests = {}, {}
+    for k in fbegs.keys():
+        elk = []
+        edk = []
+        llk = []
+        ldk = []
+        for i, tr in enumerate(fbegs[k]):
+            earlbegs = tr[1:] < early_thr
+            elk.append(lens[k][i][earlbegs])
+            edk.append(dests[k][i][:-1][earlbegs])
+            latebegs = np.logical_not(earlbegs)
+            llk.append(lens[k][i][latebegs])
+            ldk.append(dests[k][i][:-1][latebegs])
+        early_lens[k] = elk
+        early_dests[k] = edk
+        late_lens[k] = llk
+        late_dests[k] = ldk
+    return early_lens, early_dests, late_lens, late_dests
+
 def show_sacc_latency_dist(data, ttypes=None, postthr='fixation_off', bins=150, 
                            lenlim=None):
     if ttypes is None:
