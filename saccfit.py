@@ -78,6 +78,10 @@ else:
     sacc_grow = pymc.Uniform('sacc_grow', lower=0, upper=1.,
                              doc='saccade probability grow constant')
 
+    # mult for salience difference saccprob factor
+    prob_saccpar = pymc.Uniform('prob_saccpar', lower=0., upper=2.,
+                                doc='sal diff saccprob mult')
+
     # bias toward same-image saccade
     samebias = pymc.Uniform('samebias', lower=0, upper=1.,
                             doc='same image saccade bias')
@@ -106,10 +110,11 @@ def compare_fixlens(samp_fixlen, fixlendist, eps=.000000001):
 @pymc.deterministic
 def sample_eyetrace(lt_novpars=lt_novpars, st_novpars=st_novpars, 
                     sal_tc=sal_tc, prob_tc=prob_tc, off_tnov=off_tnov, 
-                    sacc_grow=sacc_grow, samebias=samebias):
+                    sacc_grow=sacc_grow, samebias=samebias, 
+                    prob_sp=prob_saccpar):
     print 'getting samp'
     sac = Saccader(lt_novfunc, lt_novpars, st_novfunc, st_novpars, sal_tc, 
-                   off_tnov, prob_tc, sacc_grow, samebias)
+                   off_tnov, prob_tc, prob_sp, sacc_grow, samebias)
     out = sac.present_many([leftviews, rightviews], samp_pres, 
                            prestime=prestime, tstep=tstep)
     ts, sals, looks, saccs, lookprobs = out
