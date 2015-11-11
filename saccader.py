@@ -30,10 +30,9 @@ def plot_presentation(ts, sals, looks, saccs, lookprob, axbuff=.5,
 class Saccader(object):
 
     def __init__(self, lt_novfunc, lt_novpars, st_novfunc, st_novpars, 
-                 sal_timeconst, out_targnov, prob_timeconst, prob_growconst,
-                 samebias):
-        """ 
-        
+                 sal_timeconst, out_targnov, prob_timeconst, prob_diffpar, 
+                 prob_growconst, samebias):
+        """         
         numtargs - number of saccade targets excluding off of all targets, 
           this gives numtargs + 1 states
         lt_novfunc - function to use to track longterm novelty, takes number
@@ -51,6 +50,7 @@ class Saccader(object):
         self.out_targnov = out_targnov
         self.prob_tau = prob_timeconst
         self.probgrow = prob_growconst
+        self.prob_diffpar = prob_diffpar
         self.samebias = samebias
         
     def present_many(self, targnov, n=50, prestime=4000, tstep=.1):
@@ -116,6 +116,6 @@ class Saccader(object):
 
     def _dpldt(self, lprob, lsal, nlsals):
         x = nlsals - lsal
-        salgrow = np.max([np.max(x), 0])
+        salgrow = self.prob_diffpar*np.max([np.max(x), 0])
         dpldt = (-lprob + self.probgrow + salgrow) / self.prob_tau
         return dpldt
