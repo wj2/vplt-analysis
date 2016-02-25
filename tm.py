@@ -64,7 +64,43 @@ def process_guides(guides, tstep, currstep=1, filt=True, window=50.):
         guide_list.append(mslc)
     return guide_list
 
-def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False):
+def plot_estrunvar(range_, allstds, allmeans):
+    f = plt.figure()
+    ax1 = f.add_subplot(2, 1, 1)
+    ax1.plot(range_, allstds)
+    ax1.set_ylabel('std log p')
+    ax2 = f.add_subplot(2, 1, 2, sharex=ax1)
+    ax2.plot(range_, allmeans)
+    ax2.set_xlabel('samples')
+    ax2.set_ylabel('mean log p')
+    f.tight_layout()
+    plt.show(block=False)
+
+def get_range_estrunvar(range_, rns, par=False, tstep=1., guides=None, proc=True,
+                        show=True):
+    allps = np.zeros((len(range_), rns))
+    allstds = np.zeros(len(range_))
+    allmeans = np.zeros(len(range_))
+    for i, x in enumerate(range_):
+        ps, pstd = estimate_runvar(rns, x, par=par, tstep=tstep, guides=guides,
+                                   proc=proc, show=False)
+        allps[i, :] = ps
+        allstds[i] = pstd
+        allmeans[i] = np.mean(ps)
+    if show:
+        plot_estrunvar(range_, allstds, allmeans)
+    return allps, allmeans, allstds
+
+def estimate_runvar(est_n, n, par=False, tstep=1., guides=None, proc=True,
+                    show=False):
+    ps = np.zeros(est_n)
+    for i in xrange(est_n):
+        outs = do_and_plot(n, par=par, tstep=tstep, guides=guides, proc=proc, 
+                           show=show)
+        ps[i] = np.mean(np.log(outs[-1]))
+    return ps, np.std(ps)
+
+def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False, show=True):
     tau_h = 30.
     rtf_func = identity_func
     eff = .5
@@ -117,7 +153,8 @@ def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False):
         plooks = np.zeros(hs.shape)
         for i, row in enumerate(plooks):
             row[:] = np.mean(looks_2d == i, axis=0)
-    plot_ss(ts, hs, plooks, saccts, lp)
+    if show:
+        plot_ss(ts, hs, plooks, saccts, lp)
     return ts, hs, looks, saccts, lp, ps
 
 def proc_many_outs(outs):
