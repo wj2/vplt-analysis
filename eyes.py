@@ -100,10 +100,10 @@ def split_early_late(lens, dests, fbegs, early_thr):
     return early_lens, early_dests, late_lens, late_dests
 
 def show_sacc_latency_dist(data, ttypes=None, postthr='fixation_off', bins=150, 
-                           lenlim=None):
+                           lenlim=None, onim=False):
     if ttypes is None:
         ttypes = [7, 8, 9, 10]
-    fls = get_first_sacc_latency(data, ttypes, postthr=postthr)
+    fls = get_first_sacc_latency(data, ttypes, postthr=postthr, onim=onim)
     all_fls = collapse_list_dict(fls)
     
     f = plt.figure()
@@ -171,7 +171,7 @@ def show_fixtime_dist(lens, cutoffmax=3000, bins=500):
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
     for tt in lens.keys():
-        c_lens = np.concatenate(lens[tt], axis=1).T
+        c_lens = np.concatenate(lens[tt]).T
         ax.hist(c_lens, bins=bins, range=(0, cutoffmax), normed=True, 
                 histtype='step')
     ax.set_xlabel('fixation time (ms)')

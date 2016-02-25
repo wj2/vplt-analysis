@@ -1,16 +1,16 @@
-import saccfit as sf
+import tmfit2 as tmf2
 import pymc
 
 if __name__ == '__main__':
-    iters = 20000
-    burn = 4000
-    thin = 4
-    save_int = 1000
+    iters = 10
+    burn = 0
+    thin = 1
+    save_int = 2
     db = 'pickle'
-    dbfile = 'saccade_fit.pkl'
+    dbfile = 'tm_fit_test.pkl'
     
-    model = pymc.MCMC(sf, db=db, dbname=dbfile)
+    model = pymc.MCMC(tmf2, db=db, dbname=dbfile)
     
     model.sample(iter=iters, burn=burn, thin=thin, save_interval=save_int)
     
-    m.db.close()
+    model.db.close()

@@ -51,14 +51,14 @@ if use_informative_priors:
     # bias toward same-image saccade
 else:
     # long-term novel function and params
-    lt_novfunc = lambda x, a, b: a*np.exp(-x) + b
+    lt_novfunc = lambda v, x, a: a[0]*np.exp(-x) + a[1]
     lt_novpars = (pymc.Uniform('lt_novpar1', lower=0., upper=5,
                                doc='lt nov multiplier'),
                   pymc.Uniform('lt_novpar2', lower=0., upper=2.,
                                doc='lt nov add'))
 
     # short-term novel function and params
-    st_novfunc = lambda x, a: -a*x
+    st_novfunc = lambda v, x, a: -a[0]*v
     st_novpars = (pymc.Uniform('st_novpar1', lower=0., upper=5.,
                                doc='st nov multiplier'),)
 
@@ -125,43 +125,6 @@ def sample_eyetrace(lt_novpars=lt_novpars, st_novpars=st_novpars,
     fixarr[:] = np.nan
     fixarr[:len(fixes)] = fixes
     return fixarr
-
-# @pymc.stochastic
-# def sample_eyetrace(lt_novpars=lt_novpars, st_novpars=st_novpars, 
-#                     sal_tc=sal_tc, prob_tc=prob_tc, off_tnov=off_tnov, 
-#                     sacc_grow=sacc_grow, samebias=samebias):
-    
-#     def logp(value, lt_novpars=lt_novpars, st_novpars=st_novpars, 
-#              sal_tc=sal_tc, prob_tc=prob_tc, off_tnov=off_tnov, 
-#              sacc_grow=sacc_grow, samebias=samebias):
-#         if not use_const_samp_logp:
-#             sac = Saccader(lt_novfunc, lt_novpars, st_novfunc, st_novpars, sal_tc, 
-#                            off_tnov, prob_tc, sacc_grow, samebias)
-
-#             ts, sals, looks, saccs, lookprobs = sac.present_many([leftviews, 
-#                                                                   rightviews],
-#                                                                  samp_pres, 
-#                                                                  prestime)
-#             samp_fixlens = np.concatenate(map(np.diff, saccs), axis=0)
-#             logp = compare_fixlens(samp_fixlens, value)
-#         else:
-#             logp = 0.0
-#         print 'logp', value, lt_novpars, st_novpars, sal_tc
-#         return logp
-        
-#     def random(lt_novpars=lt_novpars, st_novpars=st_novpars, 
-#                sal_tc=sal_tc, prob_tc=prob_tc, off_tnov=off_tnov, 
-#                sacc_grow=sacc_grow, samebias=samebias):
-#         print 'getting samp'
-#         sac = Saccader(lt_novfunc, lt_novpars, st_novfunc, st_novpars, sal_tc, 
-#                        off_tnov, prob_tc, sacc_grow, samebias)
-#         ts, sals, looks, saccs, lookprobs = sac.present([leftviews, rightviews],
-#                                                         prestime)
-#         fixes = np.diff(saccs)
-#         fixarr = np.zeros(sacclen)
-#         fixarr[:] = np.nan
-#         fixarr[:len(fixes)] = fixes
-#         return fixarr
 
 @pymc.stochastic(observed=True)
 def model_fixlen_to_actual(model_distrib=sample_eyetrace, 

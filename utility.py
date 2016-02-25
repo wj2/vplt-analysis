@@ -15,9 +15,11 @@ def load_data(path, varname='superx'):
 
 def load_separate(paths, pattern=None, varname='x'):
     files = []
+    pattern = '.*' + pattern
     for p in paths:
         if os.path.isdir(p):
             f = os.listdir(p)[1:]
+            f = [os.path.join(p, x) for x in f]
             files = files + f
         else:
             files.append(p)
@@ -30,6 +32,11 @@ def load_separate(paths, pattern=None, varname='x'):
         else:
             alldata = np.concatenate((alldata, d), axis=0)
     return alldata
+
+def get_only_vplt(data, condrange=(7, 20), condfield='trial_type'):
+    mask =np.logical_and(data[condfield] >= condrange[0], 
+                         data[condfield] <= condrange[1])
+    return data[mask]
 
 def distribute_imglogs(il_path, out_path):
     il_list = os.listdir(il_path)

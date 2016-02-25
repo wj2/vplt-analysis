@@ -357,15 +357,18 @@ def show_nlook_activity(data, tts, n, labels, pretime=-100, binsize=2,
     return avgus, sus
 
 def comb_ci_saccimg(img_sus, xs_i, sacc_sus, xs_s, ipsicontra='contra', 
-                    base=None, title='', figsize=(14, 5), suptitle=''):
+                    base=None, title='', figsize=(14, 5), suptitle='',
+                    save=False, savename='saccimg_fig.pdf'):
     f = plt.figure(figsize=figsize)
     ax_img = f.add_subplot(1, 2, 1)
     ax_sacc = f.add_subplot(1, 2, 2)
     show_contra_ipsi_suavg(img_sus, xs_i, ipsicontra=ipsicontra, base=base, 
-                           title=title+' - imglock', ax=ax_img)
+                           title=title+'zeroed to image onset', ax=ax_img)
     show_contra_ipsi_suavg(sacc_sus, xs_s, ipsicontra=ipsicontra, base=base,
-                           title=title+' - sacclock', ax=ax_sacc)
+                           title=title+'zeroed to first saccade', ax=ax_sacc)
     f.suptitle(suptitle)
+    if save:
+        f.savefig(savename, bbox_inches='tight')
     plt.show()
 
 def show_contra_ipsi_suavg(sus, xs, ipsicontra='contra', base=None, 
@@ -443,12 +446,17 @@ def plot_t1_t2_avg(novs, fams, xs, title='', ax=None):
     if ax is None:
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
-    ax.plot(xs, np.nanmean(fams, axis=0), label='fam')
-    ax.plot(xs, np.nanmean(novs, axis=0), label='nov')
+    print fams, novs
+    ax.plot(xs, np.nanmean(fams, axis=0), label='to familiar')
+    ax.plot(xs, np.nanmean(novs, axis=0), label='to novel')
     ax.set_xlabel('time (ms)')
     ax.set_ylabel('firing rate (spks/s)')
     ax.set_title(title)
-    ax.legend()
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    ax.legend(frameon=False)
     if ax is None:
         plt.show()
     return novs, fams
