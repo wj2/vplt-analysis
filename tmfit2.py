@@ -12,15 +12,15 @@ import random
 
 info_name_temp = 'proc_guides_{}ms.npy'
 
-tau_h = pymc.TruncatedNormal('tau_h', 30., 10., 0.01, 10000)
+tau_h = pymc.TruncatedNormal('tau_h', 30., 1/(10.**2)., 0.01, 10000)
 eff = pymc.Uniform('eff', lower=.001, upper=1.)
-tau_f = pymc.TruncatedNormal('tau_f', 20., 10., 0.01, 10000)
-tau_d = pymc.TruncatedNormal('tau_d', 100., 20., 0.01, 10000)
-a = pymc.TruncatedNormal('a', 5., 1., 0.01, 10000)
-tau_x = pymc.TruncatedNormal('tau_x', 200., 50., 0.01, 10000)
-tau_u = pymc.TruncatedNormal('tau_u', 200., 50., 0.01, 10000)
+tau_f = pymc.TruncatedNormal('tau_f', 20., 1/(10.**2), 0.01, 10000)
+tau_d = pymc.TruncatedNormal('tau_d', 100., 1/(20.**2), 0.01, 10000)
+a = pymc.TruncatedNormal('a', 5., 1/(1.**2), 0.01, 10000)
+tau_x = pymc.TruncatedNormal('tau_x', 200., 1/(50.**2), 0.01, 10000)
+tau_u = pymc.TruncatedNormal('tau_u', 200., 1/(50.**2), 0.01, 10000)
 
-prob_tc = pymc.Uniform('prob_tc', lower=10., upper=100000.)
+prob_tc = pymc.DiscreteUniform('prob_tc', lower=10., upper=100000.)
 prob_gc = pymc.Uniform('prob_gc', lower=0., upper=10.)
 prob_dp = pymc.Uniform('prob_dp', lower=0., upper=10.)
 prob_sb = pymc.Uniform('prob_sb', lower=0., upper=.5)
@@ -33,7 +33,7 @@ fam_img = pymc.Uniform('fam_img', lower=0., upper=1.5)
 prestime = 4000
 tstep = 10.
 observations = np.load(info_name_temp.format(int(tstep)))
-guide_buff = pymc.TruncatedNormal('guide_buff', 600/tstep, 100/tstep,
+guide_buff = pymc.TruncatedNormal('guide_buff', 600/tstep, 1/((100./tstep)**2),
                                   500/tstep, 1000/tstep)
 
 plot_preses = False
@@ -48,13 +48,13 @@ def eyetrace(prob_tc=prob_tc, prob_gc=prob_gc, prob_dp=prob_dp,
              samebias=prob_sb, tau_h=tau_h, eff=eff, tau_f=tau_f, 
              tau_d=tau_d, a=a, tau_x=tau_x, tau_u=tau_u, 
              nov_img=nov_img, fam_img=fam_img, off_img=off_img,
-             guide_buff=guide_buff, value=observations):
+             guide_buff=guide_buff, look_mod=look_mod, value=observations):
     
     def logp(prob_tc=prob_tc, prob_gc=prob_gc, prob_dp=prob_dp, 
              samebias=prob_sb, tau_h=tau_h, eff=eff, tau_f=tau_f, 
              tau_d=tau_d, a=a, tau_x=tau_x, tau_u=tau_u, 
              nov_img=nov_img, fam_img=fam_img, off_img=off_img,
-             guide_buff=guide_buff, value=observations):
+             guide_buff=guide_buff, look_mod=look_mod, value=observations):
         rtf_func = lambda x: x
         sac = SalSacc(prob_tc, prob_gc, prob_dp, samebias, tau_h, rtf_func, eff, 
                       tau_f, tau_d, a, tau_x=tau_x, tau_u=tau_u)

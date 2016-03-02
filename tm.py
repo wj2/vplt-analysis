@@ -100,27 +100,46 @@ def estimate_runvar(est_n, n, par=False, tstep=1., guides=None, proc=True,
         ps[i] = np.mean(np.log(outs[-1]))
     return ps, np.std(ps)
 
-def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False, show=True):
-    tau_h = 30.
+def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False, show=True,
+                params=None):
     rtf_func = identity_func
-    eff = .5
-    tau_f = 10.
-    tau_d = 100.
-    a = 2.
-    tau_x = 200.
-    tau_u = 200.
-
-    prob_tc = 10000.
-    prob_growconst = .05
-    prob_diffpar = 1.
-    samebias = 0.
-    gbuff = 600./tstep
     tend = 4000.
-
-    look_mod = .2
-    off_img = .02
-    nov_img = .8
-    fam_img = .1
+    if params is None:
+        tau_h = 30.
+        eff = .5
+        tau_f = 10.
+        tau_d = 100.
+        a = 2.
+        tau_x = 200.
+        tau_u = 200.
+        
+        prob_tc = 10000.
+        prob_growconst = .05
+        prob_diffpar = 1.
+        samebias = 0.
+        gbuff = 600./tstep
+        
+        look_mod = .2
+        off_img = .02
+        nov_img = .8
+        fam_img = .1
+    else:
+        tau_h = params['tau_h']
+        eff = params['eff']
+        tau_f = params['tau_f']
+        tau_d = params['tau_d']
+        a = params['a']
+        tau_x = params['tau_x']
+        tau_u = params['tau_u']
+        prob_tc = params['prob_tc']
+        prob_growconst = params['prob_gc']
+        prob_diffpar = params['prob_dp']
+        samebias = params['prob_sb']
+        gbuff = params['guide_buff']
+        look_mod = params['look_mod']
+        off_img = params['off_img']
+        nov_img = params['nov_img']
+        fam_img = params['fam_img']    
     rs = np.array([off_img, nov_img, fam_img])
     ss = SalSacc(prob_tc, prob_growconst, prob_diffpar, samebias,
                  tau_h, rtf_func, eff, tau_f, tau_d, a, tau_x=tau_x, 

@@ -1,6 +1,6 @@
 
 import pymc
-from saccader import Saccader, plot_presentation
+from saccader import NaiveSaccader, plot_presentation
 import eyes as es
 import utility as u
 import os 
@@ -113,7 +113,7 @@ def sample_eyetrace(lt_novpars=lt_novpars, st_novpars=st_novpars,
                     sacc_grow=sacc_grow, samebias=samebias, 
                     prob_sp=prob_saccpar):
     print 'getting samp'
-    sac = Saccader(lt_novfunc, lt_novpars, st_novfunc, st_novpars, sal_tc, 
+    sac = NaiveSaccader(lt_novfunc, lt_novpars, st_novfunc, st_novpars, sal_tc, 
                    off_tnov, prob_tc, prob_sp, sacc_grow, samebias)
     out = sac.present_many([leftviews, rightviews], samp_pres, 
                            prestime=prestime, tstep=tstep)

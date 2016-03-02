@@ -42,6 +42,39 @@ def get_saccaders(pardict, lt_novfunc=sf.lt_novfunc, st_novfunc=st_novfunc2):
         sacs.append(sac)
     return sacs
 
+def _check_keys(x, exclusions):
+    result = True
+    for e in exclusions:
+        subresult = x[:len(e)] != e
+        result = subresult and result
+    return result
+
+def make_all_hists(mets, exclude_start=('Metropolis', '_state_'), 
+                   plot_after=8000, bins=40):
+    ks = filter(lambda x: _check_keys(x, exclude_start), mets.keys())
+    for i, k in enumerate(ks):
+        f = plt.figure()
+        ax = f.add_subplot(1, 1, 1)
+        print k, mets[k]
+        samps = mets[k][0]
+        ax.hist(samps[plot_after:], bins=40)
+        ax.set_title(ks[i])
+    plt.show(block=False)
+
+def get_ind(mets, ind, exclude_start=('Metropolis', '_state_')):
+    retdict = {}
+    ks = filter(lambda x: _check_keys(x, exclude_start), mets.keys())
+    for i, k in enumerate(ks):
+        retdict[k] = mets[k][0][ind]
+    return retdict
+
+def get_func(mets, func, burn=8000, exclude_start=('Metropolis', '_state_')):
+    retdict = {}
+    ks = filter(lambda x: _check_keys(x, exclude_start), mets.keys())
+    for i, k in enumerate(ks):
+        retdict[k] = func(mets[k][0][burn:])
+    return retdict
+
 def simulate_sacs_compare(pardict, novpres=0, fampres=10000, n=100, nplot=4,
                           ft_ref_dist=sf.observed_lendistrib, bins=100):
     sacs = get_saccaders(pardict)
