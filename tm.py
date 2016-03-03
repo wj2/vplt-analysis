@@ -378,8 +378,9 @@ class SalSacc(object):
             hs, xs, us = self.is_m.do_internal_step(i, hs, xs, us, rs + rs_mod,
                                                     tstep, tm)
             l = looks[i]
-            pls[i] = pls[i-1] + tstep*self._dpldt(pls[i-1], hs[looks[i], i], 
-                                                  hs[:, i])
+            pls[i] = np.min(pls[i-1] + tstep*self._dpldt(pls[i-1], hs[looks[i], i], 
+                                                         hs[:, i]),
+                            1.)
             if guide_traj is None:
                 if pls[i]*tstep > np.random.rand():
                     looks[i] = self._look_change(looks[i-1], 
