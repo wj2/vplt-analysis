@@ -324,7 +324,7 @@ class SalSacc(object):
     def _dpldt(self, lprob, lsal, nlsals):
         x = nlsals - lsal
         salgrow = self.prob_diffpar*np.max([np.max(x), 0])
-        dpldt = (-lprob + self.probgrow + salgrow) / self.prob_tau
+        dpldt = (-(lprob - 1)*(self.probgrow + salgrow)) / self.prob_tau
         return dpldt
 
     def simulate_many(self, n, stims, look_mod, init_h, params, guides=None):
