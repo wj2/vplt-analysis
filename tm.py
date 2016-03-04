@@ -358,7 +358,8 @@ class SalSacc(object):
 
     def simulate(self, stims, look_mod, init_h, init_x=1., init_pl=0., 
                  tend=5000, tstep=1, tbeg=0, look_def=0, gbuff=0,
-                 start_eq=(True, False, False), guide_traj=None):
+                 start_eq=(True, False, False), guide_traj=None,
+                 eps=.0000000001):
         ts = np.arange(tbeg, tend+tstep, tstep)
         hs = np.zeros((len(stims), ts.shape[0]))
         xs = np.zeros((len(stims), ts.shape[0]))
@@ -386,7 +387,7 @@ class SalSacc(object):
                 if pls[i]*tstep > np.random.rand():
                     looks[i] = self._look_change(looks[i-1], 
                                                  hs[:, i])
-                    pls[i] = 0.
+                    pls[i] = eps
                     rs_mod[looks[i-1]] = 0
                     rs_mod[looks[i]] = look_mod
                     sacc_ts.append(ts[i])
@@ -405,7 +406,7 @@ class SalSacc(object):
                 pchange_i = pls[i]*tstep*lps[looks[i]]
                 if guide_traj[gbuff+i-1] != guide_traj[gbuff+i]:
                     p[i] = pchange_i
-                    pls[i] = 0.
+                    pls[i] = eps
                     rs_mod[looks[i-1]] = 0
                     rs_mod[looks[i]] = look_mod
                     sacc_ts.append(ts[i])
