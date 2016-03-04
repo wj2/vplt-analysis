@@ -403,7 +403,7 @@ class SalSacc(object):
             else:
                 looks[i] = guide_traj[gbuff+i]
                 lps = self._get_look_pchanges(looks[i-1], hs[:, i])
-                pchange_i = pls[i]*tstep*lps[looks[i]]
+                pchange_i = pls[i]*lps[looks[i]]
                 if guide_traj[gbuff+i-1] != guide_traj[gbuff+i]:
                     p[i] = pchange_i
                     pls[i] = eps
@@ -411,7 +411,7 @@ class SalSacc(object):
                     rs_mod[looks[i]] = look_mod
                     sacc_ts.append(ts[i])
                 else:
-                    pnochange_i = (1 - pls[i]*tstep)
+                    pnochange_i = (1 - pls[i])
                     p[i] = pchange_i + pnochange_i
         if guide_traj is not None:
             guide_p = np.prod(p)

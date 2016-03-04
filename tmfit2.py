@@ -20,7 +20,7 @@ a = pymc.TruncatedNormal('a', 3.96, 1/(1.**2), 0.01, 10000)
 tau_x = pymc.TruncatedNormal('tau_x', 200., 1/(50.**2), 0.01, 10000)
 tau_u = pymc.TruncatedNormal('tau_u', 200., 1/(50.**2), 0.01, 10000)
 
-prob_tc = pymc.DiscreteUniform('prob_tc', lower=10., upper=100000.)
+prob_tc = pymc.DiscreteUniform('prob_tc', lower=50., upper=100000.)
 prob_gc = pymc.Uniform('prob_gc', lower=0., upper=10.)
 prob_dp = pymc.Uniform('prob_dp', lower=0., upper=10.)
 prob_sb = pymc.Uniform('prob_sb', lower=0., upper=.5)
