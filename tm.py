@@ -384,7 +384,7 @@ class SalSacc(object):
                                                           hs[:, i]),
                              1.])
             if guide_traj is None:
-                if pls[i]*tstep > np.random.rand():
+                if pls[i] > np.random.rand():
                     looks[i] = self._look_change(looks[i-1], 
                                                  hs[:, i])
                     pls[i] = eps
@@ -394,8 +394,8 @@ class SalSacc(object):
                 else:
                     looks[i] = looks[i-1]
                 lps = self._get_look_pchanges(looks[i-1], hs[:, i])
-                pchange_i = pls[i]*tstep*lps[looks[i]]
-                pnochange_i = (1 - pls[i]*tstep)
+                pchange_i = pls[i]*lps[looks[i]]
+                pnochange_i = (1 - pls[i])
                 if looks[i] != looks[i-1]:
                     p[i] = pchange_i
                 else:
