@@ -12,7 +12,7 @@ import random
 
 info_name_temp = 'proc_guides_{}ms.npy'
 
-tau_h = pymc.TruncatedNormal('tau_h', 30., 1/(10.**2)., 0.01, 10000)
+tau_h = pymc.TruncatedNormal('tau_h', 30., 1/(10.**2), 0.01, 10000)
 eff = pymc.TruncatedNormal('eff', .122, 1/(2.**2), .001, 1.)
 tau_f = pymc.TruncatedNormal('tau_f', 20., 1/(10.**2), 0.01, 10000)
 tau_d = pymc.TruncatedNormal('tau_d', 100., 1/(20.**2), 0.01, 10000)
