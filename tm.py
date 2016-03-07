@@ -427,6 +427,8 @@ class SalSacc(object):
             if i == lookind:
                 ls = ls + self.samebias
             lps[i] = ls/sump
+        if np.any(lps > 1):
+            sys.stderr.write('err lps:'+str(lps))
         return lps
             
     def _look_change(self, lookind, sals):
