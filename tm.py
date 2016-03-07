@@ -242,7 +242,7 @@ def plot_imgsal(ts, hs, xs, us, const_div=.05):
 class ImgSalience(object):
     
     def __init__(self, tau_h, rtf_func, eff, tau_f, tau_d, a, 
-                 tf_func=lambda x: x, tau_x=100., tau_u=100.):
+                 tf_func=lambda x: np.max([x, 0]), tau_x=100., tau_u=100.):
         self.tau_h = tau_h
         self.rtf_func = rtf_func
         self.tf_func = tf_func
