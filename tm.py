@@ -5,6 +5,7 @@ import multiprocessing as mp
 import functools as ft
 import scipy.stats as sts
 import random
+import sys
 
 def euler_integrate(f, init, inputs, tbeg=0, tend=4000, tstep=.1):
     ts = np.arange(tbeg, tend, tstep)
