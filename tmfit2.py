@@ -37,7 +37,7 @@ guide_buff = pymc.TruncatedNormal('guide_buff', 600/tstep, 1/((100./tstep)**2),
                                   500/tstep, 1000/tstep)
 
 plot_preses = False
-samp_pres = 80
+samp_pres = 20
 
 par = False
 if par:
@@ -71,10 +71,5 @@ def eyetrace(prob_tc=prob_tc, prob_gc=prob_gc, prob_dp=prob_dp,
                                      pardict, guides=useguides)
         ts, hs_3d, lps_2d, looks_2d, saccts, fixes, ps = proc_many_outs(outs)
         logps = np.log(np.mean(ps))
-        print 'lps', logps
-        print 'mps', np.mean(ps)
-        print 'ps', ps
-        print 'PARAMS', prob_tc, prob_gc, prob_dp, prob_sb, tau_h, eff,
-        print 'PARAMS', tau_f, tau_d, a, tau_x, tau_u, nov_img, fam_img,
-        print 'PARAMS', off_img, guide_buff, look_mod
+        print logps
         return logps
