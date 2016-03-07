@@ -413,6 +413,7 @@ class SalSacc(object):
                 else:
                     pnochange_i = (1 - pls[i])
                     p[i] = pchange_i + pnochange_i
+        print np.any(p > 1), np.any(pls > 1), np.any(lps > 1)
         if guide_traj is not None:
             guide_p = np.prod(p)
         else:
