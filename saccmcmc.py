@@ -7,7 +7,7 @@ if __name__ == '__main__':
     thin = 1
     save_int = 2
     db = 'pickle'
-    dbfile = 'tm_fit_srs_rerun.pkl'
+    dbfile = 'tm_fit_srs_rerun2.pkl'
     
     model = pymc.MCMC(tmf2, db=db, dbname=dbfile)
     

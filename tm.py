@@ -144,7 +144,7 @@ def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False, show=True,
     rs = np.array([off_img, nov_img, fam_img])
     ss = SalSacc(prob_tc, prob_growconst, prob_diffpar, samebias,
                  tau_h, rtf_func, eff, tau_f, tau_d, a, tau_x=tau_x, 
-                 tau_u=tau_u)
+                 tau_u=tau_u, tf_func=thresh_linear)
     init_h = [0., 0., 0.]
     manysimdic = {'tstep':tstep, 'tend':tend, 'gbuff':gbuff}
     if guides is not None and not proc:
@@ -310,10 +310,13 @@ def _simulate_top(simmer, stims, look_mod, init_h, params, guides, n):
 def identity_func(x):
     return x
 
+def thresh_linear(x):
+    return np.max([x, 0])
+
 class SalSacc(object):
     
     def __init__(self, prob_timeconst, prob_growconst, prob_diffpar, samebias, 
-                 tau_h, rtf_func, eff, tau_f, tau_d, a, tf_func=identity_func, 
+                 tau_h, rtf_func, eff, tau_f, tau_d, a, tf_func=thresh_linear, 
                  tau_x=100., tau_u=100.):
         self.is_m = ImgSalience(tau_h, rtf_func, eff, tau_f, tau_d, a,
                                 tf_func, tau_x, tau_u)
@@ -414,7 +417,6 @@ class SalSacc(object):
                 else:
                     pnochange_i = (1 - pls[i])
                     p[i] = pchange_i + pnochange_i
-        print np.any(p > 1), np.any(pls > 1), np.any(lps > 1)
         if guide_traj is not None:
             guide_p = np.prod(p)
         else:
@@ -429,7 +431,7 @@ class SalSacc(object):
                 ls = ls + self.samebias
             lps[i] = ls/sump
         if np.any(lps > 1):
-            sys.stderr.write('err lps:'+str(lps))
+            sys.stderr.write('\nerr hs, lps:'+str(sals)+' '+str(lps))
         return lps
             
     def _look_change(self, lookind, sals):

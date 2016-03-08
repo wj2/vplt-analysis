@@ -36,8 +36,9 @@ observations = np.load(info_name_temp.format(int(tstep)))
 guide_buff = pymc.TruncatedNormal('guide_buff', 600/tstep, 1/((100./tstep)**2),
                                   500/tstep, 1000/tstep)
 
+eps = np.log(10.**(-200))
 plot_preses = False
-samp_pres = 20
+samp_pres = 80
 
 par = False
 if par:
@@ -71,5 +72,8 @@ def eyetrace(prob_tc=prob_tc, prob_gc=prob_gc, prob_dp=prob_dp,
                                      pardict, guides=useguides)
         ts, hs_3d, lps_2d, looks_2d, saccts, fixes, ps = proc_many_outs(outs)
         logps = np.log(np.mean(ps))
+        if np.isnan(logps):
+            print 'nantrip'
+            logps = eps
         print logps
         return logps
