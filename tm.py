@@ -458,7 +458,7 @@ class TMStp(object):
         return self.a*x*u*r
 
     def step(self, x, u, r, delt):
-        nx = x + delt*self._dxdt(x, u, r)
-        nu = u + delt*self._dudt(x, u, r)
+        nx = np.max([np.min([1, x + delt*self._dxdt(x, u, r)]), 0])
+        nu = np.max([np.min([1, u + delt*self._dudt(x, u, r)]), 0])
         curr = self._current(nx, nu, r)
         return nx, nu, r, curr

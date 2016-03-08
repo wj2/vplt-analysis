@@ -12,11 +12,11 @@ import random
 
 info_name_temp = 'proc_guides_{}ms.npy'
 
-tau_h = pymc.TruncatedNormal('tau_h', 30., 1/(10.**2), 1., 10000)
-eff = pymc.TruncatedNormal('eff', .122, 1/(2.**2), .001, 1.)
+tau_h = pymc.TruncatedNormal('tau_h', 30., 1/(10.**2), 5., 10000)
+eff = pymc.TruncatedNormal('eff', .122, 1/(2.**2), .001, 1.) # big U
 tau_f = pymc.TruncatedNormal('tau_f', 20., 1/(10.**2), 1., 10000)
 tau_d = pymc.TruncatedNormal('tau_d', 100., 1/(20.**2), 1., 10000)
-a = pymc.TruncatedNormal('a', 3.96, 1/(1.**2), 0.01, 10000)
+a = pymc.TruncatedNormal('a', 3.96, 1/(1.**2), 0.01, 10.) # big J
 tau_x = pymc.TruncatedNormal('tau_x', 200., 1/(50.**2), 1., 10000)
 tau_u = pymc.TruncatedNormal('tau_u', 200., 1/(50.**2), 1., 10000)
 
