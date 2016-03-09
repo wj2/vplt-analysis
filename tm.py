@@ -244,7 +244,7 @@ def plot_imgsal(ts, hs, xs, us, const_div=.05):
 class ImgSalience(object):
     
     def __init__(self, tau_h, rtf_func, eff, tau_f, tau_d, a, 
-                 tf_func=lambda x: np.max([x, 0]), tau_x=100., tau_u=100.):
+                 tf_func=lambda x: x, tau_x=100., tau_u=100.):
         self.tau_h = tau_h
         self.rtf_func = rtf_func
         self.tf_func = tf_func
@@ -281,7 +281,7 @@ class ImgSalience(object):
 
     def step(self, h, x, u, r, delt, tm):
         nx, nu, r, curr = tm.step(x, u, r, delt)
-        nh = np.max([h + delt*self._dhdt(h, curr), 0])
+        nh = max([h + delt*self._dhdt(h, curr), 0])
         return nh, nx, nu, r
 
     def make_tmstp(self):
@@ -325,7 +325,7 @@ class SalSacc(object):
 
     def _dpldt(self, lprob, lsal, nlsals):
         x = nlsals - lsal
-        salgrow = self.prob_diffpar*np.max([np.max(x), 0])
+        salgrow = self.prob_diffpar*max(x)
         dpldt = (-(lprob - 1)*(self.probgrow + salgrow)) / self.prob_tau
         return dpldt
 
@@ -457,7 +457,7 @@ class TMStp(object):
         return self.a*x*u*r
 
     def step(self, x, u, r, delt):
-        nx = np.max([np.min([1, x + delt*self._dxdt(x, u, r)]), 0])
-        nu = np.max([np.min([1, u + delt*self._dudt(x, u, r)]), 0])
+        nx = x + delt*self._dxdt(x, u, r)
+        nu = u + delt*self._dudt(x, u, r)
         curr = self._current(nx, nu, r)
         return nx, nu, r, curr
