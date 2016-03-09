@@ -38,7 +38,7 @@ guide_buff = pymc.TruncatedNormal('guide_buff', 600/tstep, 1/((100./tstep)**2),
 
 eps = np.log(10.**(-200))
 plot_preses = False
-samp_pres = 80
+samp_pres = 20
 
 par = False
 if par:

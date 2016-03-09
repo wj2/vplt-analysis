@@ -324,6 +324,12 @@ class SalSacc(object):
         self.probgrow = prob_growconst
         self.prob_diffpar = prob_diffpar
         self.samebias = samebias
+        self._param_dict = {'prob_tc':prob_timeconst,
+                            'prob_gc':prob_growconst,
+                            'prob_dp':prob_diffpar, 'prob_sb':samebias,
+                            'tau_h':tau_h, 'eff':eff, 'tau_f':tau_f,
+                            'tau_d':tau_d, 'a':a, 'tau_x':tau_x,
+                            'tau_u':tau_u}
 
     def _dpldt(self, lprob, lsal, nlsals):
         x = nlsals - lsal
@@ -407,6 +413,12 @@ class SalSacc(object):
             else:
                 looks[i] = guide_traj[gbuff+i]
                 lps = self._get_look_pchanges(looks[i-1], hs[:, i])
+                if np.any(lps > 1):
+                    sys.stderr.write('\nerr hs, lps:'+str(hs[:, i])
+                                     +' '+str(lps))
+                    pd = self._get_param_dict(stims, look_mod, gbuff)
+                    sys.stderr.write('\nparams: '+str(pd)+'\n')
+
                 pchange_i = pls[i]*lps[looks[i]]
                 if guide_traj[gbuff+i-1] != guide_traj[gbuff+i]:
                     p[i] = pchange_i
@@ -430,13 +442,18 @@ class SalSacc(object):
             if i == lookind:
                 ls = ls + self.samebias
             lps[i] = ls/sump
-        if np.any(lps > 1):
-            sys.stderr.write('\nerr hs, lps:'+str(sals)+' '+str(lps))
         return lps
             
     def _look_change(self, lookind, sals):
         lps = self._get_look_pchanges(lookind, sals)
         return np.random.choice(np.arange(sals.size), p=lps)
+
+    def _get_param_dict(self, stims, look_mod, gbuff):
+        pd = self._param_dict
+        pd['stims'] = stims
+        pd['look_mod'] = look_mod
+        pd['gbuff'] = gbuff
+        return pd
         
 class TMStp(object):
     
