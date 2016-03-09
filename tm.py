@@ -136,11 +136,11 @@ def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False, show=True,
         prob_growconst = params['prob_gc']
         prob_diffpar = params['prob_dp']
         samebias = params['prob_sb']
-        gbuff = params['guide_buff']
+        gbuff = params['gbuff']
         look_mod = params['look_mod']
-        off_img = params['off_img']
-        nov_img = params['nov_img']
-        fam_img = params['fam_img']    
+        off_img = params['stims'][0]
+        nov_img = params['stims'][1]
+        fam_img = params['stims'][2] 
     rs = np.array([off_img, nov_img, fam_img])
     ss = SalSacc(prob_tc, prob_growconst, prob_diffpar, samebias,
                  tau_h, rtf_func, eff, tau_f, tau_d, a, tau_x=tau_x, 
@@ -155,9 +155,10 @@ def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False, show=True,
     else:
         select_guides = None
     if n == 1:
-        ts, hs, saccts, lp, looks = ss.simulate(rs, look_mod, init_h, 
+        ts, hs, saccts, lp, looks, ps = ss.simulate(rs, look_mod, init_h, 
                                                 tstep=tstep, 
-                                                guide=select_guides)
+                                                guide_traj=select_guides[0])
+        plooks = [looks]
     else:
         if par:
             # potentially using same seed for each proc, investigate
@@ -280,7 +281,7 @@ class ImgSalience(object):
 
     def step(self, h, x, u, r, delt, tm):
         nx, nu, r, curr = tm.step(x, u, r, delt)
-        nh = h + delt*self._dhdt(h, curr)
+        nh = np.max([h + delt*self._dhdt(h, curr), 0])
         return nh, nx, nu, r
 
     def make_tmstp(self):
