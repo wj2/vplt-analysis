@@ -30,7 +30,7 @@ off_img = pymc.Uniform('off_img', lower=0., upper=1.5)
 nov_img = pymc.Uniform('nov_img', lower=0., upper=1.5)
 fam_img = pymc.Uniform('fam_img', lower=0., upper=1.5)
 
-prestime = 4000
+prestime = 3500
 tstep = 10.
 observations = np.load(info_name_temp.format(int(tstep)))
 guide_buff = pymc.TruncatedNormal('guide_buff', 600/tstep, 1/((100./tstep)**2),
@@ -38,7 +38,7 @@ guide_buff = pymc.TruncatedNormal('guide_buff', 600/tstep, 1/((100./tstep)**2),
 
 eps = np.log(10.**(-200))
 plot_preses = False
-samp_pres = 20
+samp_pres = 70
 
 par = False
 if par:
