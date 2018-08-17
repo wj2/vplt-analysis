@@ -10,7 +10,7 @@ def get_img_response(data, use_imgnames, pretime=-100, posttime=500,
                      onfield='centimgon', drunfield='datanum', 
                      errfield='TrialError', deserr=0, binsize=5, 
                      ttfield='trial_type', imgnumfield='image_nos',
-                     tbound=6):
+                     tbound=6, loc=None):
     noerr_data = data[data[errfield] == deserr]
     ne_corrtr_data = noerr_data[noerr_data[ttfield] <= tbound]
     druns = get_data_run_nums(ne_corrtr_data, drunfield)
@@ -24,7 +24,7 @@ def get_img_response(data, use_imgnames, pretime=-100, posttime=500,
         srun = ne_corrtr_data[ne_corrtr_data[drunfield] == dr]
         runims = {}
         for i, t in enumerate(srun):
-            imnames = get_img_names(t[imgnumfield])
+            imnames = get_img_names(t[imgnumfield], famfolder=loc)
             useims = np.array([im in use_imgnames for im in imnames])
             tims = imnames[useims]
             tons = t[onfield][useims]
@@ -81,6 +81,12 @@ def show_single_unit_resp(m_units, xs, imgs, mean=False):
             ax.plot(xs, m_units[im].T)
         ax.set_title(im)
     plt.show(block=False)
+
+def contrast_selectivity(r_vec):
+    rmin = r.min()
+    rmax = r.max()
+    s_k = (rmax - rmin)/(rmax + rmin)
+    return s_k
 
 def show_single_unit_allimg(m_units, xs, imgs, uind=None, legend=False):
     if uind is None:

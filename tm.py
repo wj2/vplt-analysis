@@ -136,11 +136,11 @@ def do_and_plot(n=1, par=True, tstep=1., guides=None, proc=False, show=True,
         prob_growconst = params['prob_gc']
         prob_diffpar = params['prob_dp']
         samebias = params['prob_sb']
-        gbuff = params['gbuff']
+        gbuff = params['guide_buff']
         look_mod = params['look_mod']
-        off_img = params['stims'][0]
-        nov_img = params['stims'][1]
-        fam_img = params['stims'][2] 
+        off_img = params['off_img']
+        nov_img = params['nov_img']
+        fam_img = params['fam_img']
     rs = np.array([off_img, nov_img, fam_img])
     ss = SalSacc(prob_tc, prob_growconst, prob_diffpar, samebias,
                  tau_h, rtf_func, eff, tau_f, tau_d, a, tau_x=tau_x, 

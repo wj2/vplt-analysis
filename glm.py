@@ -5,6 +5,32 @@ import matplotlib.pyplot as plt
 
 from utility import *
 
+def trl_glm_vars(tr, winsize, winstep):
+    # check trial type
+    # generate matrix of trial variables
+    # split dim trials into multiple trials
+    # get neural dat
+
+def organize_data_glm(data, drunfield='datanum', neurfield='spike_times',
+                      tnumfield='trialnum'):
+    druns = get_data_run_nums(data, drunfield)
+    for k, dr in enumerate(druns):
+        drdata = data[data[drunfield] == dr]
+        for i, tr in enumerate(drdata):
+            ns, ls, typ, ni = trl_glm_vars(tr, winsize, winstep)
+            if k == 0 and i == 0:
+                all_ns = ns
+                all_ni = ni
+                all_ls = ls
+                all_typ = typ
+            else:
+                all_ns = np.concatenate((all_ns, ns), axis=0)
+                all_ni = np.concatenate((all_ni, ni), axis=0)
+                all_ls = np.concatenate((all_ls, ls), axis=0)
+                all_typ = np.concatenate((all_typ, typ), axis=0)
+    return all_ns, all_ls
+
+
 def organize_dim_data(dimdat, drunfield='datanum', neurfield='spike_times',
                       usefuncs=None, params=None, tnumfield='trialnum', 
                       novfunc=views_to_member, tau1=50., bigwindows=False):
@@ -16,8 +42,8 @@ def organize_dim_data(dimdat, drunfield='datanum', neurfield='spike_times',
     if usefuncs is None:
         usefuncs = []
     if params is None:
-        params = {'begtime':200., 'endtime':0., 'binsize':5., 'q_ar':20,
-                  'neurf':neurfield, 'winsize':10., 'endflag':'reward_time',
+        params = {'begtime':200., 'endtime':0., 'binsize':50., 'q_ar':20,
+                  'neurf':neurfield, 'winsize':50., 'endflag':'reward_time',
                   'lviewf':'leftviews', 'rviewf':'rightviews', 
                   'ltimef':'left_img_on', 'rtimef':'right_img_on', 
                   'centimgf_on':'centimgon', 'centimgf_off':'centimgoff',
@@ -140,6 +166,17 @@ def extract_nf_vplt(trl, params, nbins, mask, tau1):
     rnov_r = np.repeat(rnov, nbins, axis=0)*(mask > rt + tau1)
     return np.concatenate((lnov_r, rnov_r, np.zeros(lnov_r.shape)), 
                           axis=1)
+
+def extract_dim_stim(trl, params, nbins, mask, tau1):
+    centif_on = params['centimgf_on']
+    centif_off = params['centimgf_off']
+    tcodef = params['tcodef']
+    novfunc = params['novfunc']
+    tcodes = trl[tcodef]
+    centcodes = get_cent_codes(tcodes)
+    centimgs_on = trl[centif_on] + tau1
+    centimgs_off = trl[centif_off] + tau1
+    
 
 def extract_nf_dimming(trl, params, nbins, mask, tau1, lastcodebuff=400.):
     centif_on = params['centimgf_on']

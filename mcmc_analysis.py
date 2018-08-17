@@ -55,11 +55,10 @@ def make_all_hists(mets, exclude_start=('Metropolis', '_state_'),
     for i, k in enumerate(ks):
         f = plt.figure()
         ax = f.add_subplot(1, 1, 1)
-        print k, mets[k]
         samps = mets[k][0]
         ax.hist(samps[plot_after:], bins=40)
         ax.set_title(ks[i])
-    plt.show(block=False)
+    plt.show()
 
 def get_ind(mets, ind, exclude_start=('Metropolis', '_state_')):
     retdict = {}

@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import scipy.io as sio
+import general.utility as u
 
 monthdict = {'01':'Jan', '02':'Feb', '03':'Mar', '04':'Apr', '05':'May', 
              '06':'Jun', '07':'Jul', '08':'Aug', '09':'Sep', '10':'Oct',
@@ -31,7 +32,142 @@ def load_separate(paths, pattern=None, varname='x'):
             alldata = d
         else:
             alldata = np.concatenate((alldata, d), axis=0)
-    return alldata
+    return alldata    
+
+
+# def load_bhvmat_imglog(path_bhv, path_log=None, noerr=True, prevlog_dict=None,
+#                        trial_field='TrialNumber', fixation_on=35, 
+#                        fixation_off=36, start_trial=9, datanum=0, 
+#                        lever_release=4, lever_hold=7, reward_given=48,
+#                        end_trial=18, fixation_acq=8, left_img_on=191,
+#                        left_img_off=192, right_img_on=195, right_img_off=196,
+#                        default_wid=6, default_hei=6, default_img1_xy=(-5, 0),
+#                        default_img2_xy=(5, 0), 
+#                        plt_conds=(7,8,9,10,11,12,13,14,15,16)):
+#     if prevlog_dict is None:
+#         log_dict = {}
+#     else:
+#         log_dict = prevlog_dict
+#     bhv = sio.loadmat(path_bhv)['bhv']
+#     if path_log is not None:
+#         log = open(path_log, 'rb').readlines()
+#     else:
+#         log = None
+#     trls = bhv[trial_field][0,0]
+#     fields = ['trial_type', 'TrialError', 'block_number', 'code_numbers',
+#               'code_times', 'trial_starts', 'datafile', 'datanum',
+#               'centimgon','centimgoff','trialnum','image_nos','leftimg',
+#               'rightimg', 'leftviews', 'rightviews','fixation_on','fixation_off',
+#               'lever_release','lever_hold','reward_time','ISI_start',
+#               'ISI_end','fixation_acquired','left_img_on','left_img_off',
+#               'right_img_on','right_img_off','eyepos','spike_times','LFP',
+#               'task_cond_num', 'img1_xy', 'img2_xy', 'img_wid', 'img_hei']
+#     dt = {'names':fields, 'formats':['O']*len(fields)}
+#     x = np.zeros(len(trls), dtype=dt)
+#     for i, t in enumerate(trls):
+#         x[i]['trial_type'] = bhv['ConditionNumber'][0,0][i, 0]
+#         x[i]['task_cond_num'] = bhv['ConditionNumber'][0,0][i, 0]
+#         x[i]['TrialError'] = bhv['TrialError'][0,0][i, 0]
+#         x[i]['block_number'] = bhv['BlockNumber'][0,0][i, 0]
+#         x[i]['code_numbers'] = bhv['CodeNumbers'][0,0][0, i]
+#         x[i]['code_times'] = bhv['CodeTimes'][0,0][0, i]
+#         x[i]['trial_starts'] = get_bhvcode_time(start_trial, x[i]['code_numbers'],
+#                                                 x[i]['code_times'], first=True)
+#         x[i]['ISI_end'] = get_bhvcode_time(start_trial, x[i]['code_numbers'],
+#                                            x[i]['code_times'], first=True)
+#         x[i]['ISI_start'] = get_bhvcode_time(end_trial, x[i]['code_numbers'],
+#                                              x[i]['code_times'], first=True)
+#         x[i]['datafile'] = bhv['DataFileName']
+#         x[i]['datanum'] = datanum
+#         x[i]['centimgon'] = []
+#         x[i]['centimgoff'] = []
+#         x[i]['trialnum'] = bhv['TrialNumber'][0,0][i, 0]
+#         x[i]['image_nos'] = []
+#         if x[i]['trial_type'] in plt_conds and log is not None:
+#             entry1 = log.pop(0)
+#             entry1 = entry1.strip('\r\n').split('\t')
+#             tn1, s1, _, cond1, vs1, cat1, img1 = entry1
+#             entry2 = log.pop(0)
+#             entry2 = entry2.strip('\r\n').split('\t')
+#             tn2, s2, _, cond2, vs2, cat2, img2 = entry2
+#             assert tn1 == tn2
+#             assert int(tn1) == int(x[i]['trialnum'])
+#             img1_n, ext1 = os.path.splitext(img1)
+#             img2_n, ext2 = os.path.splitext(img2)
+#             log_dict[img1_n] = log_dict.get(img1_n, 0) + 1
+#             log_dict[img2_n] = log_dict.get(img2_n, 0) + 1
+#             x[i]['leftimg'] = img1_n
+#             x[i]['rightimg'] = img2_n
+#             x[i]['leftviews'] = log_dict[img1_n]
+#             x[i]['rightviews'] = log_dict[img2_n]
+#         else:
+#             x[i]['leftimg'] = ''
+#             x[i]['rightimg'] = ''
+#             x[i]['leftviews'] = 0
+#             x[i]['rightviews'] = 0
+#         x[i]['fixation_on'] = get_bhvcode_time(fixation_on, 
+#                                                x[i]['code_numbers'],
+#                                                x[i]['code_times'], first=True)
+#         x[i]['fixation_off'] = get_bhvcode_time(fixation_off, 
+#                                                 x[i]['code_numbers'],
+#                                                 x[i]['code_times'], first=True)
+#         x[i]['lever_release'] = get_bhvcode_time(lever_release,
+#                                                  x[i]['code_numbers'],
+#                                                  x[i]['code_times'], first=True)
+#         x[i]['lever_hold'] = get_bhvcode_time(lever_hold,
+#                                               x[i]['code_numbers'],
+#                                               x[i]['code_times'], first=True)
+#         x[i]['reward_time'] = get_bhvcode_time(reward_given,
+#                                                x[i]['code_numbers'],
+#                                                x[i]['code_times'], first=True)
+#         x[i]['fixation_acquired'] = get_bhvcode_time(fixation_acq,
+#                                                      x[i]['code_numbers'],
+#                                                      x[i]['code_times'], 
+#                                                      first=True)
+#         x[i]['left_img_on'] = get_bhvcode_time(left_img_on, 
+#                                                x[i]['code_numbers'],
+#                                                x[i]['code_times'], first=True)
+#         x[i]['left_img_off'] = get_bhvcode_time(left_img_off,
+#                                                 x[i]['code_numbers'],
+#                                                 x[i]['code_times'], first=True)
+#         x[i]['right_img_on'] = get_bhvcode_time(right_img_on, 
+#                                                 x[i]['code_numbers'],
+#                                                 x[i]['code_times'], first=True)
+#         x[i]['right_img_off'] = get_bhvcode_time(right_img_off,
+#                                                  x[i]['code_numbers'],
+#                                                  x[i]['code_times'], first=True)
+#         x[i]['eyepos'] = bhv['AnalogData'][0,0][0, i]['EyeSignal'][0,0]
+#         if ('UserVars' in bhv.dtype.names 
+#             and 'img1_xy' in bhv['UserVars'][0,0].dtype.names
+#             and bhv['UserVars'][0,0]['img1_xy'].shape[1] > i):
+#             x[i]['img1_xy'] = bhv['UserVars'][0,0]['img1_xy'][0, i]
+#             x[i]['img2_xy'] = bhv['UserVars'][0,0]['img2_xy'][0, i]
+#         else:
+#             x[i]['img1_xy'] = default_img1_xy
+#             x[i]['img2_xy'] = default_img2_xy
+#         if ('UserVars' in bhv.dtype.names 
+#             and 'img_wid' in bhv['UserVars'][0,0].dtype.names
+#             and bhv['UserVars'][0,0]['img_wid'].shape[1] > i):
+#             x[i]['img_wid'] = bhv['UserVars'][0,0]['img_wid'][0, i]
+#             x[i]['img_hei'] = bhv['UserVars'][0,0]['img_hei'][0, i]
+#         else:
+#             x[i]['img_wid'] = default_wid
+#             x[i]['img_hei'] = default_hei
+#     if noerr:
+#         x = x[x['TrialError'] == 0]
+#     return x, log_dict
+
+def get_bhvcode_time(codenum, trial_codenums, trial_codetimes, first=True):
+    i = np.where(codenum == trial_codenums)[0]
+    if len(i) > 0:
+        if first:
+            i = i[0]
+        else:
+            i = i[-1]
+        ret = trial_codetimes[i][0]
+    else:
+        ret = None
+    return ret
 
 def get_only_vplt(data, condrange=(7, 20), condfield='trial_type'):
     mask =np.logical_and(data[condfield] >= condrange[0], 
@@ -168,7 +304,7 @@ def empirical_fs_cumdist(spkts, t):
     spk_before = lambda x: np.any(x < t) or (x.size == 0)
     successes = np.sum(map(spk_before, spkts))
     x = map(spk_before, spkts)
-    print successes / float(len(spkts))
+    print(successes / float(len(spkts)))
     return successes / float(len(spkts))
 
 def get_spks_window(dat, begwin, endwin):
