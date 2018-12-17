@@ -39,8 +39,8 @@ def plot_eyetrace_xy(bhv, useconds, skip=100, coff=(0,0),
                 _ = ax.plot(ef[trunc_trial::skip, 0], 
                             ef[trunc_trial::skip, 1],
                             'o')
-            loc_s.add(tuple(t[img1_xy][:, 0] + coff))
-            loc_s.add(tuple(t[img2_xy][:, 0] + coff))
+            # loc_s.add(tuple(t[img1_xy][:, 0] + coff))
+            # loc_s.add(tuple(t[img2_xy][:, 0] + coff))
             if wid is None:
                 wid = t[img_wid]
             if hei is None:
@@ -527,13 +527,16 @@ def find_saccades(eyepos, skips=1, stdthr=None, filtwin=40, thr=.1,
         if sac_es[-1] < sac_bs[-1]:
             sac_bs = sac_bs[:-1]
         sac_bs, sac_es = filter_short_fixes(sac_bs, sac_es, thr=fixthr)
+    else:
+        sac_es = np.array([])
+        sac_bs = np.array([])
     assert len(sac_bs) == len(sac_es)
     return sac_bs, sac_es
 
 def analyze_eyemove(eyep, lc, rc, skips=1, stdthr=None, filtwin=40,
                    vthr=None, thr=.1, wid=5.5, hei=5.5, postthr=None,
                    readdpost=True):
-    if postthr is not None:
+    if (postthr is not None) and (not np.isnan(postthr)):
         eyep = eyep[postthr:, :]
     sac_bs, sac_es = find_saccades(eyep, skips=skips, stdthr=stdthr, 
                                    filtwin=filtwin, vthr=vthr, thr=thr)
