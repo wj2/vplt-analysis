@@ -87,3 +87,30 @@ def error_approx_further(esses, srs, p=100):
         second_term = -2*pop_ests/(2*(p**2))
         errs[i] = ss.comb(s, 2)*(first_term + second_term)
     return errs
+
+def distortion_error_approx(esses, d1, d2, p=100):
+    errs = np.zeros((len(esses), len(d1)))
+    for i, s in enumerate(esses):
+        first_term = np.sqrt(2*(d1 + d2))/(p*np.sqrt(np.pi))
+        second_term = -(d1 + d2)/(2*(p**2))
+        errs[i] = ss.comb(s, 2)*(first_term + second_term)
+    return errs
+
+def feature_info_consumption(esses, distortion, p=100):
+    info = esses*np.log(p/np.sqrt(2*np.pi*distortion))
+    return info
+
+def feature_redundant_info(esses, d1, d2, p=100):
+    redundancy = esses*np.log(p/np.sqrt(2*np.pi*(d1 + d2)))
+    return redundancy
+
+def constrained_distortion_info(esses, distortion, p=100, diff_ds=1000,
+                                eps=.001):
+    d1 = np.linspace(eps, distortion - eps, diff_ds)
+    d2 = ((distortion**2)*d1)/((distortion**2) - d1)
+    redundancy = feature_redundant_info(esses, d1, d2, p=p)
+    info1 = feature_info_consumption(esses, d1, p=p)
+    info2 = feature_info_consumption(esses, d2, p=p)
+    pe = distortion_error_approx(esses, d1, d2, p=p)
+    return (info1, d1), (info2, d2), redundancy, pe
+                        
