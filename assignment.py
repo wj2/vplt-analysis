@@ -1,11 +1,13 @@
 
 import numpy as np
 import itertools as it
-import general.utility as u
 import scipy.special as ss
 import scipy.stats as sts
 import scipy.integrate as sin
 import scipy.optimize as sio
+
+import general.utility as u
+import mixedselectivity_theory.nms_continuous as nmc
 
 def simulate_estimates(p, s, pop_ests):
     pts = np.random.uniform(0, p, (s, 1))
@@ -238,36 +240,42 @@ def ae_integ(esses, d1, d2, p=1, integ_start=0, integ_end=None, dist_pdf=None,
         errs[i] = ss.comb(s, 2)*pes
     return errs
 
-def distortion_func(bits, features, objs, overlaps, d1=None, p=100):
+def distortion_func(bits, features, objs, overlaps, d1=None, p=100,
+                    d_cand=None):
     if d1 is not None:
-        d = _distortion_func_numerical(bits, features, objs, overlaps, d1, p=p)
-        print('num', d)
+        d = _distortion_func_numerical(bits, features, objs, overlaps, d1, p=p,
+                                       d_cand=d_cand)
     else:
         d = _distortion_func_analytical(bits, features, objs, overlaps, p=p)
-        print('ana', d)
     return d
 
 def _distortion_func_analytical(bits, features, objs, overlaps, p=100):
-    t1 = 4**(-2*overlaps/(features - overlaps))
-    t2 = np.exp(-2*bits/(objs*(features - overlaps)))
-    t3 = ((p**2)/(2*np.pi))**(1/(1 - 2*overlaps/(overlaps + features)))
+    t1 = (p**2)/(2*np.pi)
+    t2 = (1/2)**(2*overlaps/(features + overlaps))
+    t3 = np.exp(-2*bits/(objs*(features + overlaps)))
     d = t1*t2*t3
     return d
 
-def _distortion_func_numerical(bits, features, objs, overlaps, d1, p=100):
-    d_cand = _distortion_func_analytical(bits, features, objs, overlaps, p=p)
+def _distortion_func_numerical(bits, features, objs, overlaps, d1, p=100,
+                               d_cand=None):
+    if d_cand is None:
+        d_cand = _distortion_func_analytical(bits, features, objs, overlaps,
+                                             p=p)
     if np.array(d1).shape[0] > 1:
         d_cand = np.ones(d1.shape)*d_cand
         
     def _targ_func(d):
-        t1 = (p**2)/(2*np.pi)
-        t2 = np.exp(-2*bits/(objs*(features + overlaps)))
-        t3 = ((d1 - d)/(d1**2))**(2*overlaps/(overlaps + features))
-        out = t1*t2*t3 - d
-        print(d, out)
+        t1 = (p/np.sqrt(2*np.pi))**(overlaps + features)
+        t2 = (1/d)**(features/2)
+        t3 = ((d1 - d)/(d1**2))**(overlaps/2)
+        t4 = np.exp(bits/objs)
+        out = t1*t2*t3 - t4
         return out
-
-    d = sio.fsolve(_targ_func, d_cand)
+    
+    lower = np.zeros_like(d_cand)
+    upper = np.ones_like(d_cand)*np.inf
+    res = sio.least_squares(_targ_func, d_cand, bounds=(lower, upper))
+    d = res.x
     return d
 
 def d_func(d1, overall_d):
@@ -299,11 +307,116 @@ def weighted_errors_lambda(bits, features, objs, overlaps_list, d1_list=None,
         initial_d = distortion_func(bits, features, objs, overlaps, p=p)
         d2_i, d1_i = d_func(d1_list, initial_d)
         overall_d = distortion_func(bits, features, objs, overlaps, d1=d1_i,
-                                    p=p)
+                                    p=p, d_cand=initial_d)
         assignment_d = integrate_assignment_error(obj_list, d1_i, d2_i,
                                                   overlaps, p=p)
         local_d[i] = overall_d
         assignment_err[i] = assignment_d
-        totals[i] = overall_d + (lam_range*assignment_d).T
+        w_sum = overall_d.reshape((1, -1)) + lam_range*assignment_d
+        totals[i] = w_sum.T
         d1s[i] = d1_i
     return totals, local_d, assignment_err, d1s
+
+def minimum_weighted_error_lambda(bits, features, objs, p=100, lam_range=None,
+                                  lam_beg=0, lam_end_mult=3, lam_n=5000,
+                                  d1_n=5000, d1_mult=100):
+    d1_list = np.linspace(0, d1_mult*p, d1_n)
+    overlaps = np.arange(1, features + 1, 1)
+    if lam_range is None:
+        lam_range = np.linspace(lam_beg, lam_end_mult*p*features*objs, lam_n)
+    out = weighted_errors_lambda(bits, features, objs, overlaps,
+                                 d1_list=d1_list, lam_range=lam_range, p=p)
+    total, local_d, ae, d1s = out
+    flat_shape = (len(overlaps)*len(d1_list), len(lam_range))
+    o_i, d1_i = np.unravel_index(np.argmin(total.reshape(flat_shape), axis=0),
+                                 (len(overlaps), len(d1_list)))
+    opt_d1 = d1_list[d1_i]
+    opt_over = overlaps[o_i]
+    min_total = total[o_i, d1_i, range(len(lam_range))]
+    return opt_d1, opt_over, min_total, lam_range, local_d, ae, total
+
+def estimate_encoding_swap(snr, rf_size, noise_var, noise_corr, dists,
+                           noise_samps=1000, buff=None, n=None, buff_mult=4,
+                           reses=None, rf_tiling=None, c=1, o=1, excl=True,
+                           dist_samps=10000, p_measure=np.median, neurs=None,
+                           filt_func=nmc.pure_filter, power_metric='variance',
+                           samps=1000, distortion=nmc.mse_distortion,
+                           give_real=True, basin_hop=True, parallel=False,
+                           oo=False, n_hops=100):
+    if buff is None:
+        buff = rf_size
+    if n is None:
+        n = np.ceil(max(dists)) + buff_mult*buff
+        n = int(n)
+    v = (snr**2)*noise_var
+    rfs, _, trs = nmc.make_code_with_power(c, o, n, v, rf_size, buff=buff,
+                                           reses=reses, rf_tiling=rf_tiling,
+                                           excl=excl, dist_samps=dist_samps,
+                                           p_measure=p_measure, neurs=neurs,
+                                           power_metric=power_metric,
+                                           object_oriented=oo)
+    d_pairs = np.ones((len(dists), 2))*(n/2 - max(dists)/2)
+    d_pairs[:, 1] = d_pairs[:, 1] + dists
+    dummy_filt = np.identity(len(rfs))
+    all_pts = d_pairs.reshape((2*len(dists), 1))
+    trs_pts = trs(all_pts)
+    r_pts = trs_pts.reshape((len(dists), 2, 1, -1))
+    noise_mean = np.zeros(len(rfs))
+    noise_cov = np.identity(len(rfs))*np.sqrt(noise_var)
+    noise_cov[noise_cov == 0] = noise_var*noise_corr
+    noise_distrib = sts.multivariate_normal(noise_mean, noise_cov)
+    noise = noise_distrib.rvs((len(dists), noise_samps))
+    noise = noise.reshape((len(dists), 1, noise_samps, len(rfs)))
+    noise_pts = r_pts + noise
+    flat_shape = (len(dists)*2*noise_samps, len(rfs))
+    flat_noise_pts = noise_pts.reshape(flat_shape)
+    all_pts_ns = np.repeat(all_pts, noise_samps, axis=0)
+    if give_real:
+        give_pts = all_pts_ns
+    else:
+        give_pts = None
+    decoded_pts = nmc.decode_pop_resp(c, flat_noise_pts, trs, n - buff, buff,
+                                      real_pts=give_pts, basin_hop=basin_hop,
+                                      parallel=parallel, niter=n_hops)
+    dist = distortion(all_pts_ns, decoded_pts, axis=1)
+    struct_dist = dist.reshape(d_pairs.shape + (noise_samps,))
+    struct_decoded_pts = decoded_pts.reshape(d_pairs.shape + (noise_samps,))
+    struct_all_pts = all_pts_ns.reshape(d_pairs.shape + (noise_samps,))
+    return struct_dist, struct_decoded_pts, struct_all_pts
+
+def analyze_decoding(clean_pts, decoded_pts, distortion):
+    mean_dec = np.expand_dims(np.mean(decoded_pts, axis=2), axis=2)
+    bias = mean_dec[:, :, 0] - clean_pts[:, :, 0]
+    mse = np.mean((decoded_pts - clean_pts)**2, axis=2)
+    var = np.var(decoded_pts, axis=2)
+    cov = np.mean((decoded_pts[:, 0] - mean_dec[:, 0])
+                  *(decoded_pts[:, 1] - mean_dec[:, 1]), axis=1)
+    decoded_dists = np.diff(decoded_pts, axis=1)[:, 0, :]
+    switches = np.sum(decoded_dists < 0, axis=1)/decoded_pts.shape[2]
+    return bias, var, cov, switches, decoded_dists, mse
+
+def characterize_encoding(snr, rf_size, noise_var, noise_corr, dists,
+                          noise_samps=1000, buff=None, n=None, buff_mult=4,
+                          reses=None, rf_tiling=None, c=1, o=1, excl=True,
+                          dist_samps=10000, p_measure=np.median, neurs=None,
+                          filt_func=nmc.pure_filter, power_metric='variance',
+                          samps=1000, distortion=nmc.mse_distortion,
+                          give_real=True, basin_hop=True, parallel=False,
+                          oo=False, n_hops=100):
+    n_dists = len(dists)
+    n_nc = len(noise_corr)
+    bias = np.zeros((n_nc, n_dists, 2))
+    var = np.zeros_like(bias)
+    cov = np.zeros((n_nc, n_dists))
+    switch = np.zeros((n_nc, n_dists))
+    d_dists = np.zeros((n_nc, n_dists, noise_samps))
+
+    for i, nc in enumerate(noise_corr):
+        out = estimate_encoding_swap(snr, rf_size, noise_var, nc, dists,
+                                     basin_hop=basin_hop, give_real=give_real, 
+                                     noise_samps=noise_samps)
+        distortion, decoded, orig = out
+        out = analyze_decoding(orig, decoded, distortion)
+        bias[i], var[i], cov[i], switch[i], d_dists[i] = out
+    return bias, var, cov, switch, d_dists
+        
