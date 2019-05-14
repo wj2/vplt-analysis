@@ -4,10 +4,38 @@ import matplotlib.pyplot as plt
 import general.utility as u
 import general.neural_analysis as na
 import general.plotting as gpl
+import pref_looking.bias as b
 
 def nanmean_axis1(x):
     return np.nanmean(x, axis=1)
 
+def _get_leftright_conds(conds, li, ri, conds_ref='plt_conds'):
+    left_conds = (conds[conds_ref][li],)
+    right_conds = (conds[conds_ref][ri],)
+    return left_conds, right_conds
+
+def plot_first_saccade_prob(data, conds, trial_type='trial_type',
+                            left_ind=3, right_ind=0):
+    left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
+    d_lmask = data[data[trial_type] == left_conds[0]]
+    total_l = np.sum(np.logical_or(d_lmask['left_first'],
+                                   d_lmask['right_first']))
+    d_rmask = data[data[trial_type] == right_conds[0]]
+    total_r = np.sum(np.logical_or(d_rmask['left_first'],
+                                   d_rmask['right_first']))
+    total_fs = np.sum(d_lmask['left_first']) + np.sum(d_rmask['right_first'])
+    first_sacc_prob = total_fs / (total_l + total_r)
+    return first_sacc_prob
+
+def plot_bias_timecourse(data, conds, t_begin, t_end, winsize, winstep,
+                         left_ind=3, right_ind=0):
+    left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
+    out = b.get_bias_tc(data, left_conds, right_conds, use_bhv_img_params=True,
+                        winsize=winsize, winstep=winstep, fix_time=-t_begin,
+                        tlen=t_end)
+    p, e, d, p_xs = out
+    return p_xs, d
+    
 def plot_stanglm_collection(models, params, labels, param_funcs, link_strings,
                             panel_hei=6, panel_wid=6):
     n_ax = len(params)
