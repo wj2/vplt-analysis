@@ -288,6 +288,31 @@ def d_func(d1, overall_d):
         d2 = d1*overall_d/(d1 - overall_d)
     return np.array(d2), np.array(d1)
 
+def weighted_errors_bits(bits_list, features, objs_list, overlaps_list,
+                         d1_list=None, p=100, lam_range=None, lam_beg=0,
+                         lam_end_mult=100, lam_n=1000):
+    if d1_list is None:
+        d1_size = 1
+    else:
+        d1_size = len(d1_list)
+    if lam_range is None:
+        lam_size = lam_n
+    else:
+        lam_size = len(lam_range)
+    totals = np.zeros((len(bits_list), len(objs_list), len(overlaps_list),
+                       d1_size, lam_size))
+    assignment_errs = np.zeros((len(bits_list), len(objs_list),
+                                len(overlaps_list), d1_size))
+    local_ds = np.zeros_like(assignment_errs)
+    d1s = np.zeros_like(assignment_errs)
+    for i, b in enumerate(bits_list):
+        for j, o in enumerate(objs_list):
+            out = weighted_errors_lambda(b, features, o, overlaps_list,
+                                         d1_list, p, lam_range, lam_beg,
+                                         lam_end_mult, lam_n)
+            totals[i, j], local_ds[i, j], assignment_errs[i, j], d1s[i, j] = out
+    return totals, local_ds, assignment_errs, d1s
+
 def weighted_errors_lambda(bits, features, objs, overlaps_list, d1_list=None,
                            p=100, lam_range=None, lam_beg=0, lam_end_mult=100,
                            lam_n=1000):
@@ -338,14 +363,21 @@ def minimum_weighted_error_lambda(bits, features, objs, p=100, lam_range=None,
 
 def generate_1d_rfs(space_size, rf_spacing, rf_size, mult=1):
     rf_cents = np.arange(0, space_size + rf_spacing, rf_spacing)
-    func = rfm.make_gaussian_vector_rf(rf_cents, rf_size, 1, 0)
-    trs = lambda stims: mult*func(stims)
-    return trs, rf_cents
+    func, dfunc = rfm.make_gaussian_vector_rf(rf_cents, rf_size, mult, 0)
+    return func, dfunc, rf_cents
 
-def get_local_manifold_rfs(trs, pt, rf_mult=1, delt=5):
+def generate_2d_rfs(space_sizes, rf_spacings, rf_sizes, mult=1):
+    rf_cents1 = np.arange(0, space_sizes[0] + rf_spacings[0], rf_spacings[0])
+    rf_cents2 = np.arange(0, space_sizes[1] + rf_spacings[1], rf_spacings[1])
+    cents = np.array(list(it.product(rf_cents1, rf_cents2)))
+    func, dfunc = rfm.make_gaussian_vector_rf(cents, np.array(rf_sizes),
+                                              mult, 0)
+    return func, dfunc, cents
+
+def get_local_manifold_rfs(trs, pt, delt=.1):
     diff = trs(pt) - trs(pt + delt)
-    norm_diff = diff/delt # /np.sqrt(np.sum(diff**2))
-    return norm_diff/rf_mult
+    norm_diff = diff/delt
+    return norm_diff
 
 def estimate_error(local, cov):
     est_var = np.dot(local, np.dot(cov, local))
@@ -355,36 +387,86 @@ def estimate_est_cov(local1, local2, cov):
     est_cov = np.dot(local1, np.dot(cov, local2))
     return est_cov
 
-def error_theory(trs, n, dists, rf_mult, noise_cov):
+def error_theory(dtrs, n, dists, noise_cov, inv_cov=None, swap_ax=0):
     pairs = _make_pairs(dists, n)
     var = np.zeros(len(dists))
     cov = np.zeros_like(var)
+    swap = np.zeros_like(var)
+    fim = np.zeros((len(pairs), 2*pairs.shape[-1], 2*pairs.shape[-1]))
+    inv_fim = np.zeros_like(fim)
     for i, p in enumerate(pairs):
         p1, p2 = p
-        lm1 = get_local_manifold_rfs(trs, p1, rf_mult=rf_mult)[0]
-        lm2 = get_local_manifold_rfs(trs, p2, rf_mult=rf_mult)[0]
-        var[i] = estimate_error(lm1, noise_cov)
-        cov[i] = estimate_est_cov(lm1, lm2, noise_cov)
-    return var, cov
+        fim[i] = derive_fim(dtrs, p1, p2, noise_cov, inv_cov=inv_cov)
+        inv_fim[i] = np.linalg.inv(fim[i])
+        var[i] = inv_fim[i, swap_ax, swap_ax]
+        cov[i] = inv_fim[i, swap_ax, swap_ax + len(p1)]
+        swap[i] = swap_rate(var[i], cov[i], p2[swap_ax] - p1[swap_ax])
+    return var, cov, swap, fim, inv_fim
 
-def make_covariance_matrix(size, var, corr_scale, corr_func=None):
+def derive_fim(dtrs, p1, p2, noise_cov, inv_cov=None):
+    df1 = dtrs(p1.reshape((1, -1)))
+    df2 = dtrs(p2.reshape((1, -1)))
+    deriv_matrix = np.concatenate((df1, df2), axis=2)
+    if inv_cov is None:
+        inv_cov = np.linalg.inv(noise_cov)
+    fim = np.zeros((deriv_matrix.shape[2],)*2)
+    ax_combos = it.combinations_with_replacement(range(deriv_matrix.shape[2]),
+                                                 2)
+    for d1, d2 in ax_combos:
+        deriv_d1 = deriv_matrix[0, :, d1]
+        deriv_d2 = deriv_matrix[0, :, d2]
+        fim_d1d2 = np.dot(deriv_d1, np.dot(inv_cov, deriv_d2.T))
+        fim[d1, d2] = fim_d1d2
+        fim[d2, d1] = fim_d1d2
+    return fim
+
+def swap_rate(var, cov, dist):
+    distr = sts.norm(dist, np.sqrt(2*var - 2*cov))
+    p = distr.cdf(0)
+    return p
+
+def make_distance_cov_func(tau, axis=0):
+    return lambda x, y: np.exp(-((x[axis] - y[axis])**2)/tau)
+
+def make_info_limiting_cov(dtrs, pts, corr_scale, var_scale, axis=0,
+                           dtrs_eps=0):
+    enc_pts1 = dtrs(pts)
+    eps_pts = pts
+    eps_pts[:, axis] = eps_pts[:, axis] + dtrs_eps
+    enc_pts2 = dtrs(eps_pts)
+    n = enc_pts1.shape[1]
+    cov = np.zeros((n, n))
+    for i, ep in enumerate(enc_pts1):
+        comp = np.outer(ep[:, axis], enc_pts2[i][:, axis])
+        cov = cov + comp
+    diag = np.diagonal(cov)
+    s = np.mean(diag)
+    mult_factor = var_scale*corr_scale/s
+    cov = mult_factor*cov
+    am = np.identity(n)*(var_scale - np.diagonal(cov))
+    cov = cov + am
+    inv_cov = np.linalg.inv(cov)
+    return cov, inv_cov
+
+def make_covariance_matrix(cents, var, corr_scale, corr_func=None):
+    size = len(cents)
     cov = np.identity(size)*var
     if corr_func is None:
         cov[cov == 0] = corr_scale*var
     else:
-        for c in it.combinations(range(size), 2):
-            cij = var*corr_scale*corr_func(c[0], c[1])
-            cov[c[0], c[1]] = cij
-            cov[c[1], c[0]] = cij
-    return cov
+        for c0, c1 in it.combinations(range(size), 2):
+            cij = var*corr_scale*corr_func(cents[c0], cents[c1])
+            cov[c0, c1] = cij
+            cov[c1, c0] = cij
+    inv_cov = np.linalg.inv(cov)
+    return cov, inv_cov
 
-def _make_pairs(dists, n):
-    pairs = np.ones((len(dists), 2))*(n/2 - max(dists)/2)
+def _make_pairs(dists, ns):
+    dists = np.array(dists)
+    ns = np.array(ns)
+    pairs = np.ones(dists.shape +  (2,))*(ns/2 - np.max(dists, axis=0)/2)
     pairs[:, 1] = pairs[:, 1] + dists
     return pairs
-
-def make_distance_cov_func(tau):
-    return lambda x, y: np.exp(-((x - y)**2)/tau)
 
 def estimate_encoding_swap(rf_size, rf_spacing, noise_var, noise_corr, dists,
                            noise_samps=1000, rf_mult=10, space_size=None,
@@ -397,7 +479,7 @@ def estimate_encoding_swap(rf_size, rf_spacing, noise_var, noise_corr, dists,
     if space_size is None:
         space_size = np.ceil(max(dists)) + space_mult*buff
         space_size = int(space_size)
-    trs, cents = generate_1d_rfs(space_size, rf_spacing, rf_size, mult=rf_mult)
+    trs, _, cents = generate_1d_rfs(space_size, rf_spacing, rf_size, mult=rf_mult)
     d_pairs = _make_pairs(dists, space_size)
     all_pts = d_pairs.reshape((2*len(dists), 1))
     trs_pts = trs(all_pts)
@@ -429,14 +511,14 @@ def estimate_encoding_swap(rf_size, rf_spacing, noise_var, noise_corr, dists,
     return struct_dist, struct_decoded_pts, struct_all_pts
 
 def analyze_decoding(clean_pts, decoded_pts, distortion):
-    mean_dec = np.expand_dims(np.mean(decoded_pts, axis=2), axis=2)
+    mean_dec = np.expand_dims(np.nanmean(decoded_pts, axis=2), axis=2)
     bias = mean_dec[:, :, 0] - clean_pts[:, :, 0]
-    mse = np.mean((decoded_pts - clean_pts)**2, axis=2)
-    var = np.var(decoded_pts, axis=2)
-    cov = np.mean((decoded_pts[:, 0] - mean_dec[:, 0])
-                  *(decoded_pts[:, 1] - mean_dec[:, 1]), axis=1)
+    mse = np.nanmean((decoded_pts - clean_pts)**2, axis=2)
+    var = np.nanvar(decoded_pts, axis=2)
+    cov = np.nanmean((decoded_pts[:, 0] - mean_dec[:, 0])
+                     *(decoded_pts[:, 1] - mean_dec[:, 1]), axis=1)
     decoded_dists = decoded_pts[:, 1, :] - decoded_pts[:, 0, :]
-    switches = np.sum(decoded_dists < 0, axis=1)/decoded_pts.shape[2]
+    switches = np.nansum(decoded_dists < 0, axis=1)/decoded_pts.shape[2]
     return bias, var, cov, switches, decoded_dists, mse
 
 def characterize_encoding(rf_size, rf_spacing, noise_var, noise_corr, dists,
