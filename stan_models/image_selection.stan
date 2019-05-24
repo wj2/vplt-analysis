@@ -9,6 +9,10 @@ data {
   real<lower=0> prior_eps_var;
   real<lower=0> prior_bias_var;
   real<lower=0> prior_salience_var;
+  real<lower=0> prior_tnov_mean;
+  real<lower=0> prior_tfam_mean;
+  real<lower=0> prior_tnov_var;
+  real<lower=0> prior_tfam_var;
 
   // main data
   int imgs[N, L, K] ; // image selection matrix
@@ -35,6 +39,8 @@ model {
   eps ~ normal(0, prior_eps_var);
   bias ~ normal(0, prior_bias_var);
   s ~ normal(0, prior_salience_var);
+  tau_nov ~ normal(prior_tnov_mean, prior_tnov_var);
+  tau_fam ~ normal(prior_tfam_mean, prior_tfam_var);
   
   // setup
   tau_matrix = novs*tau_nov + (1 - novs)*tau_fam;
