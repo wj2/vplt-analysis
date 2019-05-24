@@ -310,9 +310,12 @@ def get_look_img(trials, left_ind, right_ind, off_ind, left_cent=(-3, 0),
         start_ind = t[eyemove_flag]
         end_ind = start_ind + fix_time + tlen
         eyeper = t[eye_field][start_ind:end_ind, :]
-        all_eyes[i, :, :] = categ_eyepos(eyeper, left_ind, right_ind, off_ind,
-                                         left_cent, right_cent, img_wid, 
-                                         img_hei)
+        if end_ind > t[eye_field].shape[0]:
+            all_eyes[i, :, :] = np.nan
+        else:
+            all_eyes[i, :, :] = categ_eyepos(eyeper, left_ind, right_ind,
+                                             off_ind, left_cent, right_cent,
+                                             img_wid, img_hei)
     return all_eyes
 
 def categ_eyepos(eyes, li, ri, oi, left_cent, right_cent, wid, hei):

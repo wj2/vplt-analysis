@@ -14,20 +14,85 @@ def _get_leftright_conds(conds, li, ri, conds_ref='plt_conds'):
     right_conds = (conds[conds_ref][ri],)
     return left_conds, right_conds
 
-def plot_first_saccade_prob(data, conds, trial_type='trial_type',
+def _get_ltrls_rtrls(data, conds, trial_type='trial_type', left_ind=3,
+                     right_ind=0):
+    left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
+    left_func = u.make_trial_constraint_func((trial_type,), (left_conds,),
+                                             (np.isin,))
+    right_func = u.make_trial_constraint_func((trial_type,), (right_conds,),
+                                              (np.isin,))
+    l_trls = data[left_func(data)]
+    r_trls = data[right_func(data)]
+    return l_trls, r_trls
+
+def get_dwell_distribution(data, conds, trial_type='trial_type', left_ind=3,
+                           right_ind=0, cutoff=-1, len_limit=None):
+    l_trls, r_trls = _get_ltrls_rtrls(data, conds, trial_type=trial_type,
+                                      left_ind=left_ind, right_ind=right_ind)
+    nov_fixes = []
+    fam_fixes = []
+    for tr in l_trls:
+        targs = tr['saccade_targ'][:-1]
+        nov_fs = tr['saccade_lens'][:cutoff][targs[:cutoff] == b'l']
+        nov_fixes = nov_fixes + list(nov_fs)
+        fam_fs = tr['saccade_lens'][:cutoff][targs[:cutoff] == b'r']
+        fam_fixes = fam_fixes + list(fam_fs)
+    for tr in r_trls:
+        targs = tr['saccade_targ'][:-1]
+        nov_fs = tr['saccade_lens'][:cutoff][targs[:cutoff] == b'r']
+        nov_fixes = nov_fixes + list(nov_fs)
+        fam_fs = tr['saccade_lens'][:cutoff][targs[:cutoff] == b'l']
+        fam_fixes = fam_fixes + list(fam_fs)
+    nov_fixes = np.array(nov_fixes)
+    fam_fixes = np.array(fam_fixes)
+    if len_limit is not None:
+        nov_fixes = nov_fixes[nov_fixes < len_limit]
+        fam_fixes = fam_fixes[fam_fixes < len_limit]
+    return nov_fixes, fam_fixes
+
+def get_fixation_proportion(data, conds, n, trial_type='trial_type', left_ind=3,
+                            right_ind=0):
+    l_trls, r_trls = _get_ltrls_rtrls(data, conds, trial_type=trial_type,
+                                      left_ind=left_ind, right_ind=right_ind)
+    nov_props = []
+    fam_props = []
+    for tr in l_trls:
+        n_sacc = tr['saccade_targ'][:n] == b'l'
+        f_sacc = tr['saccade_targ'][:n] == b'r'
+        n_prop = np.sum(n_sacc)/len(n_sacc)
+        nov_props.append(n_prop)
+        f_prop = np.sum(f_sacc)/len(f_sacc)
+        fam_props.append(f_prop)
+    for tr in r_trls:
+        n_sacc = tr['saccade_targ'][:n] == b'r'
+        f_sacc = tr['saccade_targ'][:n] == b'l'
+        n_prop = np.sum(n_sacc)/len(n_sacc)
+        nov_props.append(n_prop)
+        f_prop = np.sum(f_sacc)/len(f_sacc)
+        fam_props.append(f_prop)
+    return nov_props, fam_props
+
+def get_first_saccade_prob(data, conds, trial_type='trial_type',
                             left_ind=3, right_ind=0):
     left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
-    d_lmask = data[data[trial_type] == left_conds[0]]
+    left_func = u.make_trial_constraint_func((trial_type,), (left_conds,),
+                                             (np.isin,))
+    right_func = u.make_trial_constraint_func((trial_type,), (right_conds,),
+                                              (np.isin,))
+    d_lmask = data[left_func(data)]
     total_l = np.sum(np.logical_or(d_lmask['left_first'],
                                    d_lmask['right_first']))
-    d_rmask = data[data[trial_type] == right_conds[0]]
+    d_rmask = data[right_func(data)]
     total_r = np.sum(np.logical_or(d_rmask['left_first'],
                                    d_rmask['right_first']))
     total_fs = np.sum(d_lmask['left_first']) + np.sum(d_rmask['right_first'])
-    first_sacc_prob = total_fs / (total_l + total_r)
+    if total_l + total_r == 0:
+        first_sacc_prob = np.nan
+    else:
+        first_sacc_prob = total_fs / (total_l + total_r)
     return first_sacc_prob
 
-def plot_bias_timecourse(data, conds, t_begin, t_end, winsize, winstep,
+def get_bias_timecourse(data, conds, t_begin, t_end, winsize, winstep,
                          left_ind=3, right_ind=0):
     left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
     out = b.get_bias_tc(data, left_conds, right_conds, use_bhv_img_params=True,
@@ -393,21 +458,25 @@ def plot_several_single_units(ns, xs, neur_keys, labels, colors=None,
         f.savefig(fn, bbox_inches='tight', transparent=True)
     return f
     
-def svm_decoding_helper(datasets, dlabels, min_trials=10, resample=100,
-                        shuffle=False, kernel='linear', **params):
-    results_fam = {}
-    results_sac = {}
-    for i, d in enumerate(datasets):
-        fin, nin, _, _, sin, sout = d
-        fam_res = na.svm_decoding(nin, fin, require_trials=min_trials, 
+def svm_decoding_helper(data_dict, min_trials=10, resample=100,
+                        dec_pair_labels=None, shuffle=False,
+                        kernel='linear', **params):
+    out_dicts = {}
+    for i, kv in enumerate(data_dict.items()):
+        label, data = kv
+        for j, p in enumerate(data):
+            if dec_pair_labels is None:
+                pl = j
+            else:
+                pl = dec_pair_labels[j]
+            if i == 0:
+                out_dicts[pl] = {}
+            cat1, cat2 = p
+            dec = na.svm_decoding(cat1, cat2, require_trials=min_trials, 
                                   resample=resample, shuff_labels=shuffle,
                                   kernel=kernel, **params)
-        sac_res = na.svm_decoding(sin, sout, require_trials=min_trials,
-                                  resample=resample, shuff_labels=shuffle,
-                                  kernel=kernel, **params)
-        results_fam[dlabels[i]] = fam_res
-        results_sac[dlabels[i]] = sac_res
-    return results_fam, results_sac
+            out_dicts[pl][label] = dec
+    return out_dicts
 
 def plot_svm_decoding(results_dict, xs, figsize=None, colordict=None, ax=None):
     if ax is None:

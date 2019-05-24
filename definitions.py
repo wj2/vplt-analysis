@@ -51,8 +51,8 @@ if_plt_s = 15
 stan_plt_conds_norw = (fn_plt_s, ff_plt_s, nn_plt_s, nf_plt_s)
 stan_sdms_conds_norw = ()
 
-d1_xy_bootsy = (-3, 0)
-d2_xy_bootsy = (3, 0)
+d1_xy_bootsy = (-3.5, 0)
+d2_xy_bootsy = (3.5, 0)
 d1_xy_stan = (9, 0)
 d2_xy_stan = (-9, 0)
 d1_xy_rufus = (-9, 0)
@@ -90,6 +90,15 @@ rufus_sdms_conds_norw = (fn_sdms1_r, fn_sdms2_r, ff_sdms1_r, ff_sdms2_r,
                          fr_sdms1_r, fr_sdms2_r)
 
 # Constraint functions
+# rufus_cfs = {'nn', 'ff', 'nf', 'fn', ''}
+
+## behavior model
+rufus_bhv_model = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                'angular_separation'),
+                                               (rufus_plt_conds_norw, 0, 180), 
+                                               (np.isin, np.equal, np.equal),
+                                               combfunc=np.logical_and)
+
 ## sdmst
 fam_targ_in = u.make_trial_constraint_func(('trial_type', 'TrialError'),
                                            (fn_sdms1_r, 0), 

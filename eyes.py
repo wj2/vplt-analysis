@@ -535,7 +535,7 @@ def find_saccades(eyepos, skips=1, stdthr=None, filtwin=40, thr=.1,
 
 def analyze_eyemove(eyep, lc, rc, skips=1, stdthr=None, filtwin=40,
                    vthr=None, thr=.1, wid=5.5, hei=5.5, postthr=None,
-                   readdpost=True):
+                    readdpost=True, fixthr=10):
     if (postthr is not None) and (not np.isnan(postthr)):
         eyep = eyep[postthr:, :]
     sac_bs, sac_es = find_saccades(eyep, skips=skips, stdthr=stdthr, 
