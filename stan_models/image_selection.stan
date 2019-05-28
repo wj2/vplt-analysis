@@ -23,35 +23,36 @@ data {
 
 parameters {
   vector[L] s; // image inherent saliences
-  vector<lower=0>[K] bias; // target bias terms
+  vector<lower=0>[K - 1] bias; // target bias terms
   real eps; // novelty bias
-  real<lower=0.0001, upper=10000> tau_nov; // familiarity decay
-  real<lower=0.0001, upper=10000> tau_fam; // familiarity decay
+  real<lower=0> tau_nov; // familiarity decay
+  real<lower=0> tau_img; // familiarity decay
 }
 
 model {
   // var declarations
   matrix[N, K] img_s;
   matrix[N, K] outcome_evidence;
-  matrix[N, K] tau_matrix;
+  // matrix[N, K] tau_matrix;
 
   // priors
   eps ~ normal(0, prior_eps_var);
   bias ~ normal(0, prior_bias_var);
   s ~ normal(0, prior_salience_var);
   tau_nov ~ normal(prior_tnov_mean, prior_tnov_var);
-  tau_fam ~ normal(prior_tfam_mean, prior_tfam_var);
+  tau_img ~ normal(prior_tfam_mean, prior_tfam_var);
   
   // setup
-  tau_matrix = novs*tau_nov + (1 - novs)*tau_fam;
+  // tau_matrix = novs*tau_nov + (1 - novs)*tau_fam;
   
   for (k in 1:K) {
     img_s[:, k] = to_matrix(imgs[:, :, k])*s;
   }
   
-  outcome_evidence = (img_s + novs * eps) .* exp(-views ./ tau_matrix);
+  outcome_evidence = (img_s .* exp(-views/tau_img)
+		      + eps * novs .* exp(-views ./ tau_nov));
   
-  for(k in 1:K) {
+  for(k in 1:(K - 1)) {
     outcome_evidence[:, k] = outcome_evidence[:, k] + bias[k];
   }
   
