@@ -72,6 +72,12 @@ def get_fixation_proportion(data, conds, n, trial_type='trial_type', left_ind=3,
         fam_props.append(f_prop)
     return nov_props, fam_props
 
+def get_side_bias(data):
+    lf = data['left_first']
+    rf = data['right_first']
+    side_bias = np.sum(lf)/(np.sum(lf) + np.sum(rf))
+    return side_bias
+
 def get_first_saccade_prob(data, conds, trial_type='trial_type',
                             left_ind=3, right_ind=0):
     left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)

@@ -3,65 +3,109 @@ import numpy as np
 import pystan as ps
 import pickle
 import os
+import re
 import matplotlib.pyplot as plt
+import multiprocessing as mp
 
 import general.plotting as gpl
+import pref_looking.plt_analysis as pl
 
 model_path = 'pref_looking/stan_models/image_selection.pkl'
 model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
 
+def get_stan_params(mf, param, mask=None, skip_end=1):
+    names = mf.flatnames
+    means = mf.get_posterior_mean()[:-skip_end]
+    param = '\A' + param
+    par_mask = np.array(list([re.match(param, x) is not None for x in names]))
+    par_means = means[par_mask]
+    if mask is not None:
+        par_means = par_means[mask]
+    return par_means
 
-def plot_stan_model(outmodel, f=None, fsize=(12, 4), lw=5):
+def get_novfam_sal_diff(fit, fit_params, param='s.*', central_func=np.mean,
+                        sal_central_func=np.mean, nov_val=1, fam_val=0,
+                        fam_field='img_cats'):
+    nov_mask = fit_params[fam_field] == nov_val
+    fam_mask = fit_params[fam_field] == fam_val
+    nov_sals = get_stan_params(fit, param, mask=nov_mask)
+    fam_sals = get_stan_params(fit, param, mask=fam_mask)
+    nov_means = sal_central_func(nov_sals, axis=0)
+    fam_means = sal_central_func(fam_sals, axis=0)
+    avg_diff = central_func(nov_means - fam_means)
+    return avg_diff
+
+def get_bias_diff(fit, fit_params, param='bias.*', central_func=np.mean):
+    both_bias = get_stan_params(fit, param)
+    bias_diff = -np.diff(both_bias, axis=0)
+    return central_func(bias_diff)
+
+def get_nov_bias(fit, fit_params, param='eps.*', central_func=np.mean):
+    eps = get_stan_params(fit, param)
+    return central_func(eps)
+
+def get_full_nov_effect(fit, fit_params, sal_param='s.*', bias_param='eps.*'):
+    eps = get_nov_bias(fit, fit_params, param=bias_param)
+    avg_sdiff = get_novfam_sal_diff(fit, fit_params, param=sal_param)
+    return eps + avg_sdiff
+
+def stan_scatter_plot(model_dict, analysis_dict, stan_func, analysis_func,
+                      ax=None):
+    if ax is None:
+        f = plt.figure()
+        ax = f.add_subplot(1,1,1)
+    stan_vals = np.zeros(len(model_dict))
+    analy_vals = np.zeros_like(stan_vals)
+    for i, (k, stan_v) in enumerate(model_dict.items()):
+        fit, params, diags = stan_v
+        analy_v = analysis_dict[k]
+        stan_vals[i] = stan_func(fit, params)
+        analy_vals[i] = analysis_func(analy_v)
+    cc = np.corrcoef(stan_vals, analy_vals)
+    ax.plot(stan_vals, analy_vals, 'o')
+    rc = np.round(cc[1,0]**2, 2)
+    ax.set_title(r'$R^{2} = '+'{}$'.format(rc))
+    return stan_vals, analy_vals
+
+def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
+                     nov_param='eps.*', bias_param='bias.*', sal_param='s.*',
+                     lil=.1):
     if f is None:
         f = plt.figure(figsize=fsize)
-    fit, params, diags = outmodel
-    means = fit.get_posterior_mean()
-    names = fit.flatnames
-    it = range(len(names))
-    sal_mask = list(filter(lambda i: names[i][0] == 's', it))
-    img_nov_mask = params['img_cats'] == 1
-    img_fam_mask = params['img_cats'] == 0
-    sals = means[sal_mask]
-    biases = means[sal_mask[-1]+1:sal_mask[-1]+3]
-    novelty = means[sal_mask[-1]+3]
-    tau_nov = means[-3]
-    tau_img = means[-2]
-    ax1 = f.add_subplot(1, 3, 1)
-    ax2 = f.add_subplot(1, 3, 2)
-    ax1.hist(np.mean(sals[img_nov_mask], axis=1), histtype='step',
-             linewidth=lw, label='nov', density=True)
-    ax1.hist(np.mean(sals[img_fam_mask], axis=1), histtype='step',
-             linewidth=lw, label='fam', density=True)
-    ax1.legend(frameon=False)
-    ax1.set_xlabel('inferred salience')
-    ax1.set_ylabel('number of images')
-    mean_abs_sals = np.mean(np.abs(sals), axis=0)
-    mean_bias = -np.diff(biases, axis=0)[0]
-    param_list = (mean_abs_sals, novelty, mean_bias)
-    param_label = (r'$E[|s|]$', r'$\epsilon_{nov}$', r'$\Delta b$')
-    for i, par in enumerate(param_list):
-        pair = np.array((min(par), max(par)))
-        xs = np.array([i, i])
-        gpl.plot_trace_werr(xs, pair, ax=ax2, linewidth=lw)
-    gpl.clean_plot(ax1, 0)
-    ax2.set_xticks(range(len(par)))
-    ax2.set_xticklabels(param_label)
-    ax2.set_xlim([-.5, i + .5])
-    ax2.set_ylabel('weighting')
+    ax_sal = f.add_subplot(2, 1, 1)
+    ax_par = f.add_subplot(2, 1, 2)
+    nov_col = None
+    fam_col = None
+    nov_fits = np.zeros((len(model_dict), chains))
+    bias_fits = np.zeros((len(model_dict), 2, chains))
+    expsal_fits = np.zeros((len(model_dict), chains))
+    for i, (k, v) in enumerate(model_dict.items()):
+        fit, params, diags = v
+        nov_sals = get_stan_params(fit, sal_param, params['img_cats'] == 1)
+        nov_sals = np.expand_dims(np.mean(nov_sals, axis=1), axis=0).T
+        fam_sals = get_stan_params(fit, sal_param, params['img_cats'] == 0)
+        fam_sals = np.expand_dims(np.mean(fam_sals, axis=1), axis=0).T
+        xs = np.array([i])
+        nl = gpl.plot_trace_werr(xs - lil, nov_sals, ax=ax_sal, linewidth=lw,
+                                 color=nov_col, error_func=gpl.conf95_interval)
+        fl = gpl.plot_trace_werr(xs + lil, fam_sals, ax=ax_sal, linewidth=lw,
+                                 color=fam_col, error_func=gpl.conf95_interval)
+        nov_col = nl[0].get_color()
+        fam_col = fl[0].get_color()
 
-    views = np.arange(30)
-    salience_nov = (np.mean(mean_abs_sals)*np.exp(-views/np.mean(tau_img))
-                    + np.mean(novelty)*np.exp(-views/np.mean(tau_nov)))
-    salience_fam = np.mean(mean_abs_sals)*np.exp(-views/np.mean(tau_img))
-    ax3 = f.add_subplot(1, 3, 3)
-    gpl.plot_trace_werr(views, salience_nov, ax=ax3, linewidth=lw,
-                        label='novel')
-    gpl.plot_trace_werr(views, salience_fam, ax=ax3, linewidth=lw,
-                        label='familiar')
-    ax3.set_xlabel('number of views')
-    ax3.set_ylabel('average image weighting')
-    return f 
-    
+        nov_fits[i] = get_stan_params(fit, param=nov_param)
+        bias_fits[i] = get_stan_params(fit, param=bias_param)
+        expsal_fits[i] = np.mean(np.abs(np.concatenate((nov_sals, fam_sals))))
+    xs = np.arange(len(model_dict))
+    gpl.plot_trace_werr(xs, nov_fits.T, ax=ax_par, label='novel')
+    l = gpl.plot_trace_werr(xs, bias_fits[:, 0, :].T, ax=ax_par,
+                            label='bias 1')
+    col = l[0].get_color()
+    gpl.plot_trace_werr(xs, bias_fits[:, 1, :].T, ax=ax_par, label='bias 2',
+                        color=col)
+    gpl.plot_trace_werr(xs, expsal_fits.T, ax=ax_par, label='salience')
+    return f
+        
 def recompile_model(mp=model_path):
     p, ext = os.path.splitext(mp)
     stan_path = p + '.stan'
@@ -69,18 +113,41 @@ def recompile_model(mp=model_path):
     pickle.dump(sm, open(mp, 'wb'))
     return mp
 
-def fit_run_models(run_dict, model_path=model_path, prior_dict=None):
+def fit_run_models(run_dict, model_path=model_path, prior_dict=None,
+                   stan_params=None, parallel=False):
     sm = pickle.load(open(model_path, 'rb'))
     out_models = {}
+    if stan_params is None:
+        stan_params = {}
     if prior_dict is None:
         prior_dict = {}
+    args_list = []
     for i, run_k in enumerate(run_dict.keys()):
         params, mappings = run_dict[run_k]
-        params.update(prior_dict)
-        fit = sm.sampling(data=params)
-        diags = ps.diagnostics.check_hmc_diagnostics(fit)
-        out_models[run_k] = (fit, params, diags)
-    return out_models
+        args_list.append((run_k, params, prior_dict, stan_params, sm,
+                          parallel))
+    if parallel:
+        try:
+            pool = mp.Pool(processes=mp.cpu_count())
+            out_list = pool.map(_map_stan_fitting, args_list)
+        finally:
+            pool.close()
+            pool.join()
+    else:
+        out_list = map(_map_stan_fitting, args_list)
+    out_models = dict(out_list)
+    return sm, out_models
+
+def _map_stan_fitting(args):
+    run_i, params, prior_dict, stan_params, sm, parallel = args
+    if parallel:
+        n_jobs = 1
+    else:
+        n_jobs = -1
+    params.update(prior_dict)
+    fit = sm.sampling(data=params, n_jobs=n_jobs, **stan_params)
+    diags = ps.diagnostics.check_hmc_diagnostics(fit)
+    return run_i, (fit, params, diags)
 
 def _swap_string_for_levels(arr, mapping=None):
     types = np.unique(arr)
@@ -108,16 +175,23 @@ def _get_common_swap(arrs):
         start_ind = end_ind
     return output_arrs, bm, fm
 
-def generate_stan_datasets(data, constraint_func, run_field='datanum',
-                           **params):
+def generate_stan_datasets(data, constraint_func, conds=None,
+                           run_field='datanum', **params):
     data = data[constraint_func(data)]
     runs = np.unique(data[run_field])
     run_dict = {}
+    analysis_dict = {}
     for i, run in enumerate(runs):
         data_run = data[data[run_field] == run]
         out = format_predictors_outcomes(data_run, **params)
         run_dict[run] = out
-    return run_dict
+        if conds is not None:
+            fsp = pl.get_first_saccade_prob(data_run, conds)
+        else:
+            fsp = None
+        side_bias = pl.get_side_bias(data_run)
+        analysis_dict[run] = (fsp, side_bias)
+    return run_dict, analysis_dict
 
 outcome_mapping = {b'l':1, b'r':2, b'o':3}
 def format_predictors_outcomes(data, outcome='first_look', li='leftimg',

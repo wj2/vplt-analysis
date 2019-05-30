@@ -9,10 +9,6 @@ data {
   real<lower=0> prior_eps_var;
   real<lower=0> prior_bias_var;
   real<lower=0> prior_salience_var;
-  real<lower=0> prior_tnov_mean;
-  real<lower=0> prior_tfam_mean;
-  real<lower=0> prior_tnov_var;
-  real<lower=0> prior_tfam_var;
 
   // main data
   int imgs[N, L, K] ; // image selection matrix

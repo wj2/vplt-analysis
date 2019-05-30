@@ -90,7 +90,6 @@ rufus_sdms_conds_norw = (fn_sdms1_r, fn_sdms2_r, ff_sdms1_r, ff_sdms2_r,
                          fr_sdms1_r, fr_sdms2_r)
 
 # Constraint functions
-# rufus_cfs = {'nn', 'ff', 'nf', 'fn', ''}
 
 ## behavior model
 rufus_bhv_model = u.make_trial_constraint_func(('trial_type', 'TrialError',
@@ -325,3 +324,37 @@ saccout_itc_stan = u.make_trial_constraint_func(('trial_type', 'right_first',
 # Timing functions
 fix_off_func = u.make_time_field_func('fixation_off')
 first_sacc_func = u.make_time_field_func('first_sacc_time')
+
+
+# Parameter collections
+eye_params = {}
+eye_params['Rufus'] = {'skips':1, 'stdthr':None, 'filtwin':40, 'thr':.07,
+                       'fixthr':10, 'vthr':None}
+eye_params['Bootsy'] = {'skips':1, 'stdthr':None, 'filtwin':40, 'thr':.07,
+                        'fixthr':10, 'vthr':None}
+eye_params['Stan'] = {'skips':1, 'stdthr':None, 'filtwin':40, 'thr':.07,
+                      'fixthr':10, 'vthr':None}
+
+reading_params = {}
+reading_params['Stan'] = {'plt_conds': stan_plt_conds_norw,
+                          'sdms_conds': stan_sdms_conds_norw,
+                          'noerr': False, 'ephys': True,
+                          'default_img1_xy': d1_xy_stan, 
+                          'default_img2_xy':d2_xy_stan,
+                          'default_wid':img_wid_big, 
+                          'default_hei':img_hei_big,
+                          'eye_params':eye_params['Stan']}
+reading_params['Bootsy'] = {'plt_conds': bootsy_plt_conds_norw,
+                            'sdms_conds': bootsy_sdms_conds_norw,
+                            'noerr': False, 'ephys': True,
+                            'default_img1_xy': d1_xy_bootsy, 
+                            'default_img2_xy':d2_xy_bootsy,
+                            'default_wid':img_wid, 
+                            'default_hei':img_hei,
+                            'eye_params':eye_params['Bootsy']}
+reading_params['Rufus'] = {'plt_conds': rufus_plt_conds_norw,
+                           'sdms_conds': rufus_sdms_conds_norw,
+                           'noerr': False, 'ephys': True,
+                           'default_img1_xy': d1_xy_rufus, 
+                           'default_img2_xy':d2_xy_rufus,
+                           'eye_params':eye_params['Rufus']}
