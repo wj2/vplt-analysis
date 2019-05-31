@@ -86,7 +86,7 @@ if __name__ == '__main__':
                        'control':control_dict}
     
     fit_models = select.fit_run_models(run_dict, prior_dict=prior_dict, 
-                                       model_path=model_path,
+                                       model_path=model_path, parallel=True,
                                        stan_params=stan_param_dict)
 
     dt = str(datetime.datetime.now()).replace(' ', '-')
