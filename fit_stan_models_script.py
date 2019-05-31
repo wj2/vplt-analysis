@@ -85,10 +85,11 @@ if __name__ == '__main__':
     stan_param_dict = {'chains':args.chains, 'iter':args.length,
                        'control':control_dict}
     
-    fit_models = select.fit_run_models(run_dict, prior_dict=prior_dict, 
-                                       model_path=model_path, parallel=True,
-                                       stan_params=stan_param_dict)
-
+    out = select.fit_run_models(run_dict, prior_dict=prior_dict, 
+                                model_path=model_path, parallel=True,
+                                stan_params=stan_param_dict)
+    model, fit_models = out
+    fit_models = select.store_models(fit_models)
     dt = str(datetime.datetime.now()).replace(' ', '-')
     fname = args.output_pattern.format(monkey_key, dt)
     fname = os.path.join(args.outfolder, fname)

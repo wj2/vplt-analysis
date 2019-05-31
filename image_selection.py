@@ -13,6 +13,13 @@ import pref_looking.plt_analysis as pl
 model_path = 'pref_looking/stan_models/image_selection.pkl'
 model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
 
+def store_models(model_collection):
+    new_collection = {}
+    for k, (fit, params, diags) in model_collection.items():
+        new_fit = ModelFitContainer(fit)
+        new_collection[k] = (new_fit, params, diags)
+    return new_collection
+
 def get_stan_params(mf, param, mask=None, skip_end=1):
     names = mf.flatnames
     means = mf.get_posterior_mean()[:-skip_end]
@@ -245,3 +252,19 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
                   'views':views, 'y':outcomes, 'img_cats':mapped_cats}
     return param_dict, mappings
 
+class ModelFitContainer(object):
+
+    def __init__(self, fit):
+        self.flatnames = fit.flatnames
+        self._posterior_means = fit.get_posterior_mean()
+        self.samples = fit.extract()
+        self._summary = fit.stansummary()
+
+    def get_posterior_mean(self):
+        return self._posterior_means
+
+    def stansummary(self):
+        return self._summary
+
+    def __repr__(self):
+        return self._summary
