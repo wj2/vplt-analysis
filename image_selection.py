@@ -56,8 +56,8 @@ def get_full_nov_effect(fit, fit_params, sal_param='s.*', bias_param='eps.*'):
     avg_sdiff = get_novfam_sal_diff(fit, fit_params, param=sal_param)
     return eps + avg_sdiff
 
-def stan_scatter_plot(model_dict, analysis_dict, stan_func, analysis_func,
-                      ax=None):
+def stan_scatter_plot(model_dict, analysis_dict, func1, func2,
+                      ax=None, func1_stan=True, func2_stan=False):
     if ax is None:
         f = plt.figure()
         ax = f.add_subplot(1,1,1)
@@ -66,8 +66,16 @@ def stan_scatter_plot(model_dict, analysis_dict, stan_func, analysis_func,
     for i, (k, stan_v) in enumerate(model_dict.items()):
         fit, params, diags = stan_v
         analy_v = analysis_dict[k]
-        stan_vals[i] = stan_func(fit, params)
-        analy_vals[i] = analysis_func(analy_v)
+        if func1_stan:
+            args1 = (fit, params)
+        else:
+            args1 = (analy_v,)
+        if func2_stan:
+            args2 = (fit, params)
+        else:
+            args2 = (analy_v,)
+        stan_vals[i] = func1(*args1)
+        analy_vals[i] = func2(*args2)
     cc = np.corrcoef(stan_vals, analy_vals)
     ax.plot(stan_vals, analy_vals, 'o')
     rc = np.round(cc[1,0]**2, 2)
