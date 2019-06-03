@@ -6,6 +6,7 @@ data {
   int<lower=0> L; // number of images
   
   // prior data
+  real prior_eps_mean;
   real<lower=0> prior_eps_var;
   real<lower=0> prior_bias_var;
   real<lower=0> prior_salience_var;
@@ -29,7 +30,7 @@ model {
   matrix[N, K] outcome_evidence;
 
   // priors
-  eps ~ normal(0, prior_eps_var);
+  eps ~ normal(prior_eps_mean, prior_eps_var);
   bias ~ normal(0, prior_bias_var);
   s ~ normal(0, prior_salience_var);
   

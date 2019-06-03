@@ -15,6 +15,8 @@ def create_parser():
                         'data files')
     parser.add_argument('monkey_key', type=str, help='key for monkey identity '
                         'used to reference definitions file')
+    parser.add_argument('-p', '--nov_bias_mean', default=0, type=float,
+                        help='mean for novelty bias prior')
     parser.add_argument('-n', '--nov_bias_var', default=10, type=float,
                         help='variance for novelty bias prior')
     parser.add_argument('-b', '--side_bias_var', default=5, type=float,
@@ -38,6 +40,9 @@ def create_parser():
                         'each chain')
     parser.add_argument('--adapt_delta', type=float, default=.8,
                         help='adapt_delta value to use')
+    parser.add_argument('--not_parallel', default=False, action='store_true',
+                        help='do not distribute model fits across available '
+                        'cores -- does this by default')
     return parser
 
 if __name__ == '__main__':
@@ -71,22 +76,24 @@ if __name__ == '__main__':
 
     out = select.generate_stan_datasets(data_we, selection_cfs, pdict)
     run_dict, analysis_dict = out
-    
+
+    pem = args.nov_bias_mean
     pev = args.nov_bias_var
     pbv = args.side_bias_var
     psv = args.salience_var
 
     model_path = args.model_path
 
-    prior_dict = {'prior_eps_var':pev, 'prior_bias_var':pbv,
-                  'prior_salience_var':psv}
+    prior_dict = {'prior_eps_mean':pem, 'prior_eps_var':pev,
+                  'prior_bias_var':pbv, 'prior_salience_var':psv}
 
     control_dict = {'adapt_delta':args.adapt_delta}
     stan_param_dict = {'chains':args.chains, 'iter':args.length,
                        'control':control_dict}
+    parallel = not args.not_parallel
     
     out = select.fit_run_models(run_dict, prior_dict=prior_dict, 
-                                model_path=model_path, parallel=True,
+                                model_path=model_path, parallel=parallel,
                                 stan_params=stan_param_dict)
     model, fit_models = out
     fit_models = select.store_models(fit_models)

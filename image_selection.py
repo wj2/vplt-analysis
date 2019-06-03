@@ -6,6 +6,7 @@ import os
 import re
 import matplotlib.pyplot as plt
 import multiprocessing as mp
+import itertools as it
 
 import general.plotting as gpl
 import pref_looking.plt_analysis as pl
@@ -84,7 +85,7 @@ def stan_scatter_plot(model_dict, analysis_dict, func1, func2,
 
 def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
                      nov_param='eps.*', bias_param='bias.*', sal_param='s.*',
-                     lil=.1):
+                     lil=.1, sort_by_nov=True, sal_pairs=1000):
     if f is None:
         f = plt.figure(figsize=fsize)
     ax_sal = f.add_subplot(2, 1, 1)
@@ -94,6 +95,7 @@ def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
     nov_fits = np.zeros((len(model_dict), chains))
     bias_fits = np.zeros((len(model_dict), 2, chains))
     expsal_fits = np.zeros((len(model_dict), chains))
+    sal_diff = np.zeros((len(model_dict), chains))
     for i, (k, v) in enumerate(model_dict.items()):
         fit, params, diags = v
         nov_sals = get_stan_params(fit, sal_param, params['img_cats'] == 1)
@@ -111,16 +113,32 @@ def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
         nov_fits[i] = get_stan_params(fit, param=nov_param)
         bias_fits[i] = get_stan_params(fit, param=bias_param)
         expsal_fits[i] = np.mean(np.abs(np.concatenate((nov_sals, fam_sals))))
+        sals = _sample_pairs(np.concatenate((nov_sals, fam_sals)),
+                             n=sal_pairs)
+        sal_diff[i] = np.mean(sals)
     xs = np.arange(len(model_dict))
-    gpl.plot_trace_werr(xs, nov_fits.T, ax=ax_par, label='novel')
-    l = gpl.plot_trace_werr(xs, bias_fits[:, 0, :].T, ax=ax_par,
-                            label='bias 1')
-    col = l[0].get_color()
-    gpl.plot_trace_werr(xs, bias_fits[:, 1, :].T, ax=ax_par, label='bias 2',
-                        color=col)
-    gpl.plot_trace_werr(xs, expsal_fits.T, ax=ax_par, label='salience')
+    nov_mag = np.abs(nov_fits)
+    bias_diff = np.abs(np.diff(bias_fits, axis=1))
+    norm = nov_mag + bias_diff[:, 0] + sal_diff
+    if sort_by_nov:
+        sort_inds = np.argsort(np.mean(nov_mag/norm, axis=1))
+    norm = norm[sort_inds].T
+    gpl.plot_trace_werr(xs, nov_mag[sort_inds].T/norm, ax=ax_par, label='novel',
+                        marker='o')
+    gpl.plot_trace_werr(xs, bias_diff[sort_inds, 0].T/norm, ax=ax_par,
+                        label='bias diff', marker='o')
+    gpl.plot_trace_werr(xs, sal_diff[sort_inds].T/norm, ax=ax_par, marker='o',
+                        label='salience')
     return f
-        
+
+def _sample_pairs(sals, n=500):
+    all_pairs = list(it.combinations(range(len(sals)), 2))
+    permuted_pairs = np.random.permutation(all_pairs)
+    dists = np.zeros(n)
+    for i, (s1, s2) in enumerate(permuted_pairs[:n]):
+        dists[i] = np.abs(sals[s1] - sals[s2])
+    return dists
+
 def recompile_model(mp=model_path):
     p, ext = os.path.splitext(mp)
     stan_path = p + '.stan'
