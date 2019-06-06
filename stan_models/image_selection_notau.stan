@@ -33,20 +33,16 @@ model {
   // priors
   eps ~ normal(prior_eps_mean, prior_eps_var);
   bias ~ normal(0, prior_bias_var);
-  salience_var ~ normal(0, prior_salience_var);
+  // salience_var ~ normal(0, prior_salience_var);
   s ~ normal(0, salience_var);
   
   // setup
   for (k in 1:K) {
-    img_s[:, k] = to_matrix(imgs[:, :, k])*s;
+    img_s[:, k] = to_matrix(imgs[:, :, k])*s + bias[k];
   }
   
   outcome_evidence = img_s + novs * eps;
-  
-  for(k in 1:(K - 1)) {
-    outcome_evidence[:, k] = outcome_evidence[:, k] + bias[k];
-  }
-  
+    
   for (n in 1:N) {
     y[n] ~ categorical_logit(outcome_evidence[n]');
   }
