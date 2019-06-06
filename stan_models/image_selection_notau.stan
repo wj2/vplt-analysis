@@ -38,11 +38,15 @@ model {
   
   // setup
   for (k in 1:K) {
-    img_s[:, k] = to_matrix(imgs[:, :, k])*s + bias[k];
+    img_s[:, k] = to_matrix(imgs[:, :, k])*s;
   }
   
   outcome_evidence = img_s + novs * eps;
-    
+  
+  for(k in 1:(K - 1)) {
+    outcome_evidence[:, k] = outcome_evidence[:, k] + bias[k];
+  }
+  
   for (n in 1:N) {
     y[n] ~ categorical_logit(outcome_evidence[n]');
   }
