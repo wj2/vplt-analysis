@@ -20,7 +20,7 @@ data {
 
 parameters {
   vector[L] s; // image inherent saliences
-  real<lower=0> salience_var;
+  real<lower=1e-10, upper=1e5> salience_var;
   vector<lower=0>[K - 1] bias; // target bias terms
   real eps; // novelty bias
 }
