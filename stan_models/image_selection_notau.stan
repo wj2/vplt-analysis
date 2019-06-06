@@ -20,6 +20,7 @@ data {
 
 parameters {
   vector[L] s; // image inherent saliences
+  real<lower=0> salience_var;
   vector<lower=0>[K - 1] bias; // target bias terms
   real eps; // novelty bias
 }
@@ -32,7 +33,8 @@ model {
   // priors
   eps ~ normal(prior_eps_mean, prior_eps_var);
   bias ~ normal(0, prior_bias_var);
-  s ~ normal(0, prior_salience_var);
+  salience_var ~ normal(0, prior_salience_var);
+  s ~ normal(0, salience_var);
   
   // setup
   for (k in 1:K) {
