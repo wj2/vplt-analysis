@@ -9,7 +9,8 @@ data {
   real prior_eps_mean;
   real<lower=0> prior_eps_var;
   real<lower=0> prior_bias_var;
-  real<lower=0> prior_salience_var;
+  real prior_salience_var_mean;
+  real<lower=0> prior_salience_var_var;
 
   // main data
   int imgs[N, L, K] ; // image selection matrix
@@ -20,7 +21,7 @@ data {
 
 parameters {
   vector[L] s; // image inherent saliences
-  real<lower=1e-10, upper=1e5> salience_var;
+  real<lower=1e-10> salience_var;
   vector<lower=0>[K - 1] bias; // target bias terms
   real eps; // novelty bias
 }
@@ -32,8 +33,8 @@ model {
 
   // priors
   eps ~ normal(prior_eps_mean, prior_eps_var);
+  salience_var ~ normal(prior_salience_var_mean, prior_salience_var_var);
   bias ~ normal(0, prior_bias_var);
-  // salience_var ~ normal(0, prior_salience_var);
   s ~ normal(0, salience_var);
   
   // setup
