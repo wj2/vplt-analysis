@@ -9,47 +9,32 @@ import multiprocessing as mp
 import itertools as it
 
 import general.plotting as gpl
+import general.stan_utility as su
 import pref_looking.plt_analysis as pl
 
 model_path = 'pref_looking/stan_models/image_selection.pkl'
 model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
 
-def store_models(model_collection):
-    new_collection = {}
-    for k, (fit, params, diags) in model_collection.items():
-        new_fit = ModelFitContainer(fit)
-        new_collection[k] = (new_fit, params, diags)
-    return new_collection
-
-def get_stan_params(mf, param, mask=None, skip_end=1):
-    names = mf.flatnames
-    means = mf.get_posterior_mean()[:-skip_end]
-    param = '\A' + param
-    par_mask = np.array(list([re.match(param, x) is not None for x in names]))
-    par_means = means[par_mask]
-    if mask is not None:
-        par_means = par_means[mask]
-    return par_means
 
 def get_novfam_sal_diff(fit, fit_params, param='s.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
                         fam_field='img_cats'):
     nov_mask = fit_params[fam_field] == nov_val
     fam_mask = fit_params[fam_field] == fam_val
-    nov_sals = get_stan_params(fit, param, mask=nov_mask)
-    fam_sals = get_stan_params(fit, param, mask=fam_mask)
+    nov_sals = su.get_stan_params(fit, param, mask=nov_mask)
+    fam_sals = su.get_stan_params(fit, param, mask=fam_mask)
     nov_means = sal_central_func(nov_sals, axis=0)
     fam_means = sal_central_func(fam_sals, axis=0)
     avg_diff = central_func(nov_means - fam_means)
     return avg_diff
 
 def get_bias_diff(fit, fit_params, param='bias.*', central_func=np.mean):
-    both_bias = get_stan_params(fit, param)
+    both_bias = su.get_stan_params(fit, param)
     bias_diff = -np.diff(both_bias, axis=0)
     return central_func(bias_diff)
 
 def get_nov_bias(fit, fit_params, param='eps.*', central_func=np.mean):
-    eps = get_stan_params(fit, param)
+    eps = su.get_stan_params(fit, param)
     return central_func(eps)
 
 def get_full_nov_effect(fit, fit_params, sal_param='s.*', bias_param='eps.*'):
@@ -98,9 +83,9 @@ def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
     sal_diff = np.zeros((len(model_dict), chains))
     for i, (k, v) in enumerate(model_dict.items()):
         fit, params, diags = v
-        nov_sals = get_stan_params(fit, sal_param, params['img_cats'] == 1)
+        nov_sals = su.get_stan_params(fit, sal_param, params['img_cats'] == 1)
         nov_sals = np.expand_dims(np.mean(nov_sals, axis=1), axis=0).T
-        fam_sals = get_stan_params(fit, sal_param, params['img_cats'] == 0)
+        fam_sals = su.get_stan_params(fit, sal_param, params['img_cats'] == 0)
         fam_sals = np.expand_dims(np.mean(fam_sals, axis=1), axis=0).T
         xs = np.array([i])
         nl = gpl.plot_trace_werr(xs - lil, nov_sals, ax=ax_sal, linewidth=lw,
@@ -110,8 +95,8 @@ def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
         nov_col = nl[0].get_color()
         fam_col = fl[0].get_color()
 
-        nov_fits[i] = get_stan_params(fit, param=nov_param)
-        bias_fits[i] = get_stan_params(fit, param=bias_param)
+        nov_fits[i] = su.get_stan_params(fit, param=nov_param)
+        bias_fits[i] = su.get_stan_params(fit, param=bias_param)
         expsal_fits[i] = np.mean(np.abs(np.concatenate((nov_sals, fam_sals))))
         sals = _sample_pairs(np.concatenate((nov_sals, fam_sals)),
                              n=sal_pairs)
@@ -138,13 +123,6 @@ def _sample_pairs(sals, n=500):
     for i, (s1, s2) in enumerate(permuted_pairs[:n]):
         dists[i] = np.abs(sals[s1] - sals[s2])
     return dists
-
-def recompile_model(mp=model_path):
-    p, ext = os.path.splitext(mp)
-    stan_path = p + '.stan'
-    sm = ps.StanModel(file=stan_path)
-    pickle.dump(sm, open(mp, 'wb'))
-    return mp
 
 def fit_run_models(run_dict, model_path=model_path, prior_dict=None,
                    stan_params=None, parallel=False):
@@ -277,20 +255,3 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     param_dict = {'N':n, 'K':k, 'L':l, 'imgs':imgs, 'novs':novs,
                   'views':views, 'y':outcomes, 'img_cats':mapped_cats}
     return param_dict, mappings
-
-class ModelFitContainer(object):
-
-    def __init__(self, fit):
-        self.flatnames = fit.flatnames
-        self._posterior_means = fit.get_posterior_mean()
-        self.samples = fit.extract()
-        self._summary = fit.stansummary()
-
-    def get_posterior_mean(self):
-        return self._posterior_means
-
-    def stansummary(self):
-        return self._summary
-
-    def __repr__(self):
-        return self._summary

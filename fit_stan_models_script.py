@@ -69,6 +69,7 @@ if __name__ == '__main__':
     data_we = d_r[d_r['TrialError'] == 0]
     
     import pref_looking.image_selection as select
+    import general.stan_utility as su
     if args.model_path is None:
         args.model_path = select.model_path_notau
     
@@ -96,7 +97,7 @@ if __name__ == '__main__':
                                 model_path=model_path, parallel=parallel,
                                 stan_params=stan_param_dict)
     model, fit_models = out
-    fit_models = select.store_models(fit_models)
+    fit_models = su.store_models(fit_models)
     dt = str(datetime.datetime.now()).replace(' ', '-')
     fname = args.output_pattern.format(monkey_key, dt)
     fname = os.path.join(args.outfolder, fname)
