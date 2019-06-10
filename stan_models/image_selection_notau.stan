@@ -13,7 +13,7 @@ data {
   real<lower=0> prior_salience_var_var;
   real prior_bias_mean_mean;
   real<lower=0> prior_bias_mean_var;
-  real prior_bias_var_mean;
+  real<lower=0> prior_bias_var_mean;
   real<lower=0> prior_bias_var_var;
 
   // main data
@@ -26,8 +26,9 @@ data {
 parameters {
   vector[L] s; // image inherent saliences
   real<lower=0> salience_var;
+  real bias_mean;
   real<lower=0> bias_var;
-  vector<lower=0>[K - 1] bias; // target bias terms
+  vector[K - 1] bias; // target bias terms
   real eps; // novelty bias
 }
 
