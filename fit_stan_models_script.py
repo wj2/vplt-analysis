@@ -19,14 +19,14 @@ def create_parser():
                         help='mean for novelty bias prior')
     parser.add_argument('-n', '--nov_bias_var', default=10, type=float,
                         help='variance for novelty bias prior')
-    parser.add_argument('--side_bias_mean_var', default=0, type=float,
+    parser.add_argument('--side_bias_var_mean', default=0, type=float,
                         help='mean for side bias variance prior')
     parser.add_argument('-b', '--side_bias_var_var', default=50, type=float,
                         help='variance for side bias variance prior')
     parser.add_argument('--side_bias_mean_mean', default=0, type=float,
-                        help='mean for side bias variance prior')
+                        help='mean for side bias mean prior')
     parser.add_argument('--side_bias_mean_var', default=50, type=float,
-                        help='variance for side bias variance prior')
+                        help='variance for side bias mean prior')
     parser.add_argument('-s', '--salience_var_var', default=50, type=float,
                         help='variance of variance for image salience prior')
     parser.add_argument('--salience_var_mean', default=0, type=float,
