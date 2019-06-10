@@ -19,11 +19,17 @@ def create_parser():
                         help='mean for novelty bias prior')
     parser.add_argument('-n', '--nov_bias_var', default=10, type=float,
                         help='variance for novelty bias prior')
-    parser.add_argument('-b', '--side_bias_var', default=5, type=float,
-                        help='variance for side bias prior')
+    parser.add_argument('--side_bias_mean_var', default=0, type=float,
+                        help='mean for side bias variance prior')
+    parser.add_argument('-b', '--side_bias_var_var', default=50, type=float,
+                        help='variance for side bias variance prior')
+    parser.add_argument('--side_bias_mean_mean', default=0, type=float,
+                        help='mean for side bias variance prior')
+    parser.add_argument('--side_bias_mean_var', default=50, type=float,
+                        help='variance for side bias variance prior')
     parser.add_argument('-s', '--salience_var_var', default=50, type=float,
                         help='variance of variance for image salience prior')
-    parser.add_argument('--salience_var_mean', default=5, type=float,
+    parser.add_argument('--salience_var_mean', default=0, type=float,
                         help='mean of variance for image salience prior')
     parser.add_argument('-m', '--model_path', type=str,
                         default=None, help='path to stan '
@@ -82,14 +88,20 @@ if __name__ == '__main__':
 
     pem = args.nov_bias_mean
     pev = args.nov_bias_var
-    pbv = args.side_bias_var
+    pbvv = args.side_bias_var_var
+    pbvm = args.side_bias_var_mean
+    pbmv = args.side_bias_mean_var
+    pbmm = args.side_bias_mean_mean
+
     psvv = args.salience_var_var
     psvm = args.salience_var_mean
 
     model_path = args.model_path
 
     prior_dict = {'prior_eps_mean':pem, 'prior_eps_var':pev,
-                  'prior_bias_var':pbv, 'prior_salience_var_var':psvv,
+                  'prior_bias_var_var':pbvv, 'prior_bias_var_mean':pbvm,
+                  'prior_bias_mean_var':pbmv, 'prior_bias_mean_mean':pbmm,
+                  'prior_salience_var_var':psvv,
                   'prior_salience_var_mean':psvm}
 
     control_dict = {'adapt_delta':args.adapt_delta}

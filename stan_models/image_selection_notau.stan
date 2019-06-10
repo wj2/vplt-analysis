@@ -11,6 +11,10 @@ data {
   real<lower=0> prior_bias_var;
   real prior_salience_var_mean;
   real<lower=0> prior_salience_var_var;
+  real prior_bias_mean_mean;
+  real<lower=0> prior_bias_mean_var;
+  real prior_bias_var_mean;
+  real<lower=0> prior_bias_var_var;
 
   // main data
   int imgs[N, L, K] ; // image selection matrix
@@ -21,7 +25,8 @@ data {
 
 parameters {
   vector[L] s; // image inherent saliences
-  real<lower=1e-10> salience_var;
+  real<lower=0> salience_var;
+  real<lower=0> bias_var;
   vector<lower=0>[K - 1] bias; // target bias terms
   real eps; // novelty bias
 }
@@ -34,14 +39,15 @@ model {
   // priors
   eps ~ normal(prior_eps_mean, prior_eps_var);
   salience_var ~ normal(prior_salience_var_mean, prior_salience_var_var);
-  bias ~ normal(0, prior_bias_var);
+  bias_var ~ normal(prior_bias_var_mean, prior_bias_var_var);
+  bias_mean ~ normal(prior_bias_mean_mean, prior_bias_mean_var);
+  bias ~ normal(bias_mean, bias_var);
   s ~ normal(0, salience_var);
   
   // setup
   for (k in 1:K) {
     img_s[:, k] = to_matrix(imgs[:, :, k])*s;
   }
-  
   outcome_evidence = img_s + novs * eps;
   
   for(k in 1:(K - 1)) {
