@@ -21,13 +21,13 @@ def create_parser():
                         help='variance for novelty bias prior')
     parser.add_argument('--side_bias_var_mean', default=0, type=float,
                         help='mean for side bias variance prior')
-    parser.add_argument('-b', '--side_bias_var_var', default=50, type=float,
+    parser.add_argument('-b', '--side_bias_var_var', default=15, type=float,
                         help='variance for side bias variance prior')
     parser.add_argument('--side_bias_mean_mean', default=0, type=float,
                         help='mean for side bias mean prior')
-    parser.add_argument('--side_bias_mean_var', default=50, type=float,
+    parser.add_argument('--side_bias_mean_var', default=15, type=float,
                         help='variance for side bias mean prior')
-    parser.add_argument('-s', '--salience_var_var', default=50, type=float,
+    parser.add_argument('-s', '--salience_var_var', default=15, type=float,
                         help='variance of variance for image salience prior')
     parser.add_argument('--salience_var_mean', default=0, type=float,
                         help='mean of variance for image salience prior')
@@ -48,6 +48,8 @@ def create_parser():
                         'each chain')
     parser.add_argument('--adapt_delta', type=float, default=.8,
                         help='adapt_delta value to use')
+    parser.add_argument('--max_treedepth', type=int, default=10,
+                        help='maximum tree depth to use')
     parser.add_argument('--not_parallel', default=False, action='store_true',
                         help='do not distribute model fits across available '
                         'cores -- does this by default')
@@ -104,7 +106,8 @@ if __name__ == '__main__':
                   'prior_salience_var_var':psvv,
                   'prior_salience_var_mean':psvm}
 
-    control_dict = {'adapt_delta':args.adapt_delta}
+    control_dict = {'adapt_delta':args.adapt_delta,
+                    'max_treedepth':args.max_treedepth}
     stan_param_dict = {'chains':args.chains, 'iter':args.length,
                        'control':control_dict}
     parallel = not args.not_parallel

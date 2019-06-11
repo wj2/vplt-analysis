@@ -8,7 +8,6 @@ data {
   // prior data
   real prior_eps_mean;
   real<lower=0> prior_eps_var;
-  real<lower=0> prior_bias_var;
   real prior_salience_var_mean;
   real<lower=0> prior_salience_var_var;
   real prior_bias_mean_mean;
@@ -42,8 +41,8 @@ model {
   salience_var ~ normal(prior_salience_var_mean, prior_salience_var_var);
   bias_var ~ normal(prior_bias_var_mean, prior_bias_var_var);
   bias_mean ~ normal(prior_bias_mean_mean, prior_bias_mean_var);
-  bias ~ normal(bias_mean, bias_var);
-  s ~ normal(0, salience_var);
+  to_vector(bias) ~ normal(bias_mean, bias_var);
+  to_vector(s) ~ normal(0, salience_var);
   
   // setup
   for (k in 1:K) {
