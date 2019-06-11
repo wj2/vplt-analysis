@@ -14,7 +14,7 @@ import pref_looking.plt_analysis as pl
 
 model_path = 'pref_looking/stan_models/image_selection.pkl'
 model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
-
+model_path_notau_eps = 'pref_looking/stan_models/image_selection_notau_eps.pkl'
 
 def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
@@ -236,7 +236,7 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     outcomes, outcome_bm, outcome_fm = out
     mappings['outcomes'] = (outcome_bm, outcome_fm)
     data = data[valid_outcome_mask]
-
+    
     # image array
     out = _get_common_swap((data[li], data[ri]))
     l = len(out[1].keys())
@@ -247,7 +247,7 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     imgs[inds2[0], inds2[1], inds2[2]] = 1
     img_bm, img_fm = out[1], out[2]
     mappings['img'] = (img_bm, img_fm)
-
+    
     # novelty indicator array
     novs = np.zeros((n, k))
     out = _get_common_swap((data[lc], data[rc]))
