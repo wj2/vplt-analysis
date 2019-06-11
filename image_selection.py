@@ -16,7 +16,7 @@ model_path = 'pref_looking/stan_models/image_selection.pkl'
 model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
 
 
-def get_novfam_sal_diff(fit, fit_params, param='s.*', central_func=np.mean,
+def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
                         fam_field='img_cats'):
     nov_mask = fit_params[fam_field] == nov_val
@@ -28,7 +28,7 @@ def get_novfam_sal_diff(fit, fit_params, param='s.*', central_func=np.mean,
     avg_diff = central_func(nov_means - fam_means)
     return avg_diff
 
-def get_bias_diff(fit, fit_params, param='bias.*', central_func=np.mean):
+def get_bias_diff(fit, fit_params, param='bias\[.*', central_func=np.mean):
     both_bias = su.get_stan_params(fit, param)
     bias_diff = -np.diff(both_bias, axis=0)
     return central_func(bias_diff)
@@ -37,7 +37,7 @@ def get_nov_bias(fit, fit_params, param='eps.*', central_func=np.mean):
     eps = su.get_stan_params(fit, param)
     return central_func(eps)
 
-def get_full_nov_effect(fit, fit_params, sal_param='s.*', bias_param='eps.*'):
+def get_full_nov_effect(fit, fit_params, sal_param='s\[.*', bias_param='eps.*'):
     eps = get_nov_bias(fit, fit_params, param=bias_param)
     avg_sdiff = get_novfam_sal_diff(fit, fit_params, param=sal_param)
     return eps + avg_sdiff
@@ -68,11 +68,26 @@ def stan_scatter_plot(model_dict, analysis_dict, func1, func2,
     ax.set_title(r'$R^{2} = '+'{}$'.format(rc))
     return stan_vals, analy_vals
 
+def _remove_errs_models(model_dict, errfield, diag_ind=2):
+    models = {}
+    for k, v in model_dict.items():
+        if errfield is not None:
+            if v[diag_ind][errfield]:
+                models[k] = v
+        else:
+            if np.product(list(v[diag_ind].values())):
+                models[k] = v
+    return models
+
 def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
-                     nov_param='eps.*', bias_param='bias.*', sal_param='s.*',
-                     lil=.1, sort_by_nov=True, sal_pairs=1000):
+                     nov_param='eps.*', bias_param='bias\[.*', sal_param='s\[.*',
+                     lil=.1, sort_by_nov=True, sal_pairs=1000,
+                     remove_errs=True, errfield=None, diag_ind=2):
     if f is None:
         f = plt.figure(figsize=fsize)
+    if remove_errs:
+        model_dict = _remove_errs_models(model_dict, errfield,
+                                         diag_ind=diag_ind)
     ax_sal = f.add_subplot(2, 1, 1)
     ax_par = f.add_subplot(2, 1, 2)
     nov_col = None
