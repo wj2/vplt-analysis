@@ -23,12 +23,22 @@ data {
 }
 
 parameters {
-  vector[L] s; // image inherent saliences
+  // prior-related
   real<lower=0> salience_var;
   real bias_mean;
   real<lower=0> bias_var;
-  vector[K - 1] bias; // target bias terms
+
+  // data-related
+  vector[L] sal_raw; // image inherent saliences
+  vector[K - 1] bias_raw; // target bias terms
   real eps; // novelty bias
+}
+
+transformed parameters {
+  vector[K - 1] bias;
+  vector[L] s;
+  bias = bias_mean + bias_var*bias_raw;
+  s = salience_var*sal_raw;
 }
 
 model {
@@ -41,8 +51,9 @@ model {
   salience_var ~ normal(prior_salience_var_mean, prior_salience_var_var);
   bias_var ~ normal(prior_bias_var_mean, prior_bias_var_var);
   bias_mean ~ normal(prior_bias_mean_mean, prior_bias_mean_var);
-  to_vector(bias) ~ normal(bias_mean, bias_var);
-  to_vector(s) ~ normal(0, salience_var);
+  
+  bias_raw ~ normal(0, 1);
+  sal_raw ~ normal(0, 1);
   
   // setup
   for (k in 1:K) {
