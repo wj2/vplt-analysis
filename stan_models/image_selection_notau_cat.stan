@@ -58,9 +58,8 @@ model {
   
   // setup
   for (k in 1:K) {
-    img_s[:, k] = to_matrix(imgs[:, :, k])*s;
+    outcome_evidence[:, k] = to_matrix(imgs[:, :, k])*s;
   }
-  outcome_evidence = img_s;
   
   for(k in 1:(K - 1)) {
     outcome_evidence[:, k] = outcome_evidence[:, k] + bias[k];
