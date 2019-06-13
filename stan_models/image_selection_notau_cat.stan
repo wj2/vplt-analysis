@@ -8,9 +8,9 @@ data {
   // prior data
   real prior_eps_mean;
   real<lower=0> prior_eps_var;
-  real prior_salience_var_mean;
+  real<lower=0> prior_salience_var_mean;
   real<lower=0> prior_salience_var_var;
-  real prior_bias_mean_mean;
+  real<lower=0> prior_bias_mean_mean;
   real<lower=0> prior_bias_mean_var;
   real<lower=0> prior_bias_var_mean;
   real<lower=0> prior_bias_var_var;
@@ -25,7 +25,7 @@ data {
 parameters {
   // prior-related
   real<lower=0> salience_var;
-  real bias_mean;
+  real<lower=0> bias_mean;
   real<lower=0> bias_var;
 
   // data-related
@@ -35,7 +35,7 @@ parameters {
 }
 
 transformed parameters {
-  vector[K - 1] bias;
+  vector<lower=0>[K - 1] bias;
   vector[L] s;
   bias = bias_mean + bias_var*bias_raw;
   s = eps*to_vector(img_cats) + salience_var*sal_raw;

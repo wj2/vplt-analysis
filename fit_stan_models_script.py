@@ -23,7 +23,7 @@ def create_parser():
                         help='mean for side bias variance prior')
     parser.add_argument('-b', '--side_bias_var_var', default=15, type=float,
                         help='variance for side bias variance prior')
-    parser.add_argument('--side_bias_mean_mean', default=0, type=float,
+    parser.add_argument('--side_bias_mean_mean', default=5, type=float,
                         help='mean for side bias mean prior')
     parser.add_argument('--side_bias_mean_var', default=15, type=float,
                         help='variance for side bias mean prior')
