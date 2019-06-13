@@ -15,6 +15,7 @@ import pref_looking.plt_analysis as pl
 model_path = 'pref_looking/stan_models/image_selection.pkl'
 model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
 model_path_notau_eps = 'pref_looking/stan_models/image_selection_notau_eps.pkl'
+model_path_notau_cat = 'pref_looking/stan_models/image_selection_notau_cat.pkl'
 
 def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
