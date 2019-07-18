@@ -16,6 +16,7 @@ model_path = 'pref_looking/stan_models/image_selection.pkl'
 model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
 model_path_notau_eps = 'pref_looking/stan_models/image_selection_notau_eps.pkl'
 model_path_notau_cat = 'pref_looking/stan_models/image_selection_notau_cat.pkl'
+model_path_nt_all = 'pref_looking/stan_models/image_selection_nt_all.pkl'
 
 def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
@@ -29,14 +30,22 @@ def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
     avg_diff = central_func(nov_means - fam_means)
     return avg_diff
 
-def get_bias_diff(fit, fit_params, param='bias\[.*', central_func=np.mean):
+def get_bias_diff(fit, fit_params, param='bias\[.*', central_func=np.mean,
+                  lim=np.inf):
     both_bias = su.get_stan_params(fit, param)
     bias_diff = -np.diff(both_bias, axis=0)
-    return central_func(bias_diff)
+    ret = central_func(bias_diff)
+    if np.abs(ret) > lim:
+        ret = np.nan
+    return ret
 
-def get_nov_bias(fit, fit_params, param='eps.*', central_func=np.mean):
+def get_nov_bias(fit, fit_params, param='eps.*', central_func=np.mean,
+                 lim=np.inf):
     eps = su.get_stan_params(fit, param)
-    return central_func(eps)
+    ret = central_func(eps)
+    if np.abs(ret) > lim:
+        ret = np.nan
+    return ret
 
 def get_full_nov_effect(fit, fit_params, sal_param='s\[.*', bias_param='eps.*'):
     eps = get_nov_bias(fit, fit_params, param=bias_param)
@@ -63,6 +72,10 @@ def stan_scatter_plot(model_dict, analysis_dict, func1, func2,
             args2 = (analy_v,)
         stan_vals[i] = func1(*args1)
         analy_vals[i] = func2(*args2)
+    nan_mask = (np.logical_not(np.isnan(stan_vals))
+                *np.logical_not(np.isnan(analy_vals)))
+    stan_vals = stan_vals[nan_mask]
+    analy_vals = analy_vals[nan_mask]
     cc = np.corrcoef(stan_vals, analy_vals)
     ax.plot(stan_vals, analy_vals, 'o')
     rc = np.round(cc[1,0]**2, 2)
@@ -176,18 +189,21 @@ def _map_stan_fitting(args):
     diags = ps.diagnostics.check_hmc_diagnostics(fit)
     return run_i, (fit, params, diags)
 
-def _swap_string_for_levels(arr, mapping=None):
+def _swap_string_for_levels(arr, mapping=None, nonzero=False):
     types = np.unique(arr)
     lvl_arr = np.zeros_like(arr, dtype=int)
     back_mapping = {}
     forw_mapping = {}
     for i, t in enumerate(types):
         if mapping is not None:
-            lvl_arr[arr == t] = mapping[t]
+            lvl_rpl = mapping[t]
+        elif nonzero:
+            lvl_rpl = i + 1
         else:
-            lvl_arr[arr == t] = i
-        back_mapping[i] = t
-        forw_mapping[t] = i
+            lvl_rpl = i 
+        lvl_arr[arr == t] = lvl_rpl
+        back_mapping[lvl_rpl] = t
+        forw_mapping[t] = lvl_rpl
     return lvl_arr, back_mapping, forw_mapping
 
 def _get_common_swap(arrs):
@@ -203,13 +219,19 @@ def _get_common_swap(arrs):
     return output_arrs, bm, fm
 
 def generate_stan_datasets(data, constraint_func, conds=None,
-                           run_field='datanum', **params):
+                           run_field='datanum', collapse=False,
+                           **params):
     data = data[constraint_func(data)]
     runs = np.unique(data[run_field])
     run_dict = {}
     analysis_dict = {}
+    if collapse:
+        runs = ('all',)
     for i, run in enumerate(runs):
-        data_run = data[data[run_field] == run]
+        if collapse:
+            data_run = data
+        else:
+            data_run = data[data[run_field] == run]
         out = format_predictors_outcomes(data_run, **params)
         run_dict[run] = out
         if conds is not None:
@@ -224,7 +246,7 @@ outcome_mapping = {b'l':1, b'r':2, b'o':3}
 def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
                                ri='rightimg', lv='leftviews',
                                rv='rightviews', lc='leftimg_type',
-                               rc='rightimg_type',
+                               rc='rightimg_type', drunfield='datanum',
                                outcome_mapping=outcome_mapping,
                                outcome_types=(b'l', b'r', b'o')):
     outcomes = data[outcome]
@@ -237,6 +259,14 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     outcomes, outcome_bm, outcome_fm = out
     mappings['outcomes'] = (outcome_bm, outcome_fm)
     data = data[valid_outcome_mask]
+
+    # days array
+    days = data[drunfield]
+    out = _swap_string_for_levels(days, nonzero=True)
+    days, days_bm, days_fm = out
+    print(days)
+    mappings['day'] = (days_bm, days_fm)
+    n_days = len(np.unique(days))
     
     # image array
     out = _get_common_swap((data[li], data[ri]))
@@ -269,5 +299,6 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     views[:, 1] = data[rv]
 
     param_dict = {'N':n, 'K':k, 'L':l, 'imgs':imgs, 'novs':novs,
-                  'views':views, 'y':outcomes, 'img_cats':mapped_cats}
+                  'views':views, 'y':outcomes, 'img_cats':mapped_cats,
+                  'day':days, 'D':n_days}
     return param_dict, mappings
