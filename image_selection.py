@@ -264,7 +264,6 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     days = data[drunfield]
     out = _swap_string_for_levels(days, nonzero=True)
     days, days_bm, days_fm = out
-    print(days)
     mappings['day'] = (days_bm, days_fm)
     n_days = len(np.unique(days))
     
