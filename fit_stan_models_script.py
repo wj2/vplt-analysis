@@ -38,8 +38,8 @@ def create_parser():
     parser.add_argument('-m', '--model_path', type=str,
                         default=None, help='path to stan '
                         'model to fit')
-    parser.add_argument('--parallel', default=True, action='store_false',
-                        help='run in parallel')
+    parser.add_argument('--not_parallel', default=False, action='store_true',
+                        help='do not run in parallel (done by default)')
     parser.add_argument('--runfolder', default='./', type=str,
                         help='path to run the script from')
     parser.add_argument('--output_pattern', default='stanfits_{}-{}.pkl',
@@ -119,7 +119,7 @@ if __name__ == '__main__':
                     'max_treedepth':args.max_treedepth}
     stan_param_dict = {'chains':args.chains, 'iter':args.length,
                        'control':control_dict}
-    parallel = args.parallel
+    parallel = not args.not_parallel
     out = select.fit_run_models(run_dict, prior_dict=prior_dict, 
                                 model_path=model_path, parallel=parallel,
                                 stan_params=stan_param_dict)
