@@ -15,10 +15,14 @@ def create_parser():
                         'data files')
     parser.add_argument('monkey_key', type=str, help='key for monkey identity '
                         'used to reference definitions file')
-    parser.add_argument('-p', '--nov_bias_mean', default=0, type=float,
-                        help='mean for novelty bias prior')
-    parser.add_argument('-n', '--nov_bias_var', default=10, type=float,
-                        help='variance for novelty bias prior')
+    parser.add_argument('-p', '--nov_bias_mean_mean', default=0, type=float,
+                        help='mean for mean novelty bias prior')
+    parser.add_argument('-n', '--nov_bias_mean_var', default=10, type=float,
+                        help='variance for mean novelty bias prior')
+    parser.add_argument('--nov_bias_var_mean', default=5, type=float,
+                        help='mean for novelty bias variance prior')
+    parser.add_argument('--nov_bias_var_var', default=10, type=float,
+                        help='variance for novelty bias variance prior')
     parser.add_argument('--side_bias_var_mean', default=0, type=float,
                         help='mean for side bias variance prior')
     parser.add_argument('-b', '--side_bias_var_var', default=15, type=float,
@@ -50,9 +54,9 @@ def create_parser():
                         help='adapt_delta value to use')
     parser.add_argument('--max_treedepth', type=int, default=10,
                         help='maximum tree depth to use')
-    parser.add_argument('--not_parallel', default=False, action='store_true',
-                        help='do not distribute model fits across available '
-                        'cores -- does this by default')
+    parser.add_argument('--full_data', default=False, action='store_true',
+                        help='collapse data across days and fit it all at '
+                        'once -- does not do this by default')
     return parser
 
 if __name__ == '__main__':
@@ -85,33 +89,37 @@ if __name__ == '__main__':
     
     selection_cfs = d.rufus_bhv_model
 
-    out = select.generate_stan_datasets(data_we, selection_cfs, pdict)
+    collapse = args.full_data
+    out = select.generate_stan_datasets(data_we, selection_cfs, pdict,
+                                        collapse=collapse)
     run_dict, analysis_dict = out
 
-    pem = args.nov_bias_mean
-    pev = args.nov_bias_var
     pbvv = args.side_bias_var_var
     pbvm = args.side_bias_var_mean
     pbmv = args.side_bias_mean_var
     pbmm = args.side_bias_mean_mean
 
+    pevv = args.nov_bias_var_var
+    pevm = args.nov_bias_var_mean
+    pemv = args.nov_bias_mean_var
+    pemm = args.nov_bias_mean_mean
+    
     psvv = args.salience_var_var
     psvm = args.salience_var_mean
 
     model_path = args.model_path
 
-    prior_dict = {'prior_eps_mean':pem, 'prior_eps_var':pev,
-                  'prior_bias_var_var':pbvv, 'prior_bias_var_mean':pbvm,
+    prior_dict = {'prior_bias_var_var':pbvv, 'prior_bias_var_mean':pbvm,
                   'prior_bias_mean_var':pbmv, 'prior_bias_mean_mean':pbmm,
-                  'prior_salience_var_var':psvv,
-                  'prior_salience_var_mean':psvm}
+                  'prior_salience_var_var':psvv, 'prior_salience_var_mean':psvm,
+                  'prior_eps_mean_mean':pemm, 'prior_eps_mean_var':pemv, 
+                  'prior_eps_var_mean':pevm, 'prior_eps_var_var':pevv}
 
     control_dict = {'adapt_delta':args.adapt_delta,
                     'max_treedepth':args.max_treedepth}
     stan_param_dict = {'chains':args.chains, 'iter':args.length,
                        'control':control_dict}
-    parallel = not args.not_parallel
-    
+    parallel = args.parallel
     out = select.fit_run_models(run_dict, prior_dict=prior_dict, 
                                 model_path=model_path, parallel=parallel,
                                 stan_params=stan_param_dict)

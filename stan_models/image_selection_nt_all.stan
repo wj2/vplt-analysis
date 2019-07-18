@@ -85,8 +85,8 @@ model {
   for (n in 1:N) {
     d = day[n];
     oe = to_vector(outcome_evidence[n, d]);
-    oe[1] = oe[1] + bias1[d];
-    oe[2] = oe[2] + bias2[d];
+    oe[1] += bias1[d];
+    oe[2] += bias2[d];
     y[n] ~ categorical_logit(oe);
   }
 }
