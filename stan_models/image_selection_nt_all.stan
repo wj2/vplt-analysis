@@ -48,7 +48,6 @@ transformed parameters {
   vector[D] bias2;
   vector[D] eps;
   matrix[D, L] s;
-  matrix[D, L] d_cats;
   eps = eps_mean + eps_var*eps_raw;
   bias1 = bias1_mean + bias1_var*bias1_raw;
   bias2 = bias2_mean + bias2_var*bias2_raw;
