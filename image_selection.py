@@ -246,7 +246,7 @@ outcome_mapping = {b'l':1, b'r':2, b'o':3}
 def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
                                ri='rightimg', lv='leftviews',
                                rv='rightviews', lc='leftimg_type',
-                               rc='rightimg_type', drunfield='datanum',
+                               rc='rightimg_type', drunfield='datafile',
                                outcome_mapping=outcome_mapping,
                                outcome_types=(b'l', b'r', b'o')):
     outcomes = data[outcome]

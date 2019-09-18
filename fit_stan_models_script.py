@@ -128,5 +128,5 @@ if __name__ == '__main__':
     dt = str(datetime.datetime.now()).replace(' ', '-')
     fname = args.output_pattern.format(monkey_key, dt)
     fname = os.path.join(args.outfolder, fname)
-    out_dict = {'analysis':analysis_dict, 'models':fit_models}
+    out_dict = {'analysis':analysis_dict, 'models':fit_models, 'info':run_dict}
     p.dump(out_dict, open(fname, 'wb'))
