@@ -126,6 +126,7 @@ def plot_stanglm_collection(models, params, labels, param_funcs, link_strings,
                                              link_string=ls)
     return f
 
+
 def get_feat_tuning_index(a, b, boots=1000, ind_func=u.index_func,
                           with_replace=True):
     if len(a.shape) == 1:

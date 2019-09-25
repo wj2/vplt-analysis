@@ -9,6 +9,7 @@ import multiprocessing as mp
 import itertools as it
 
 import general.plotting as gpl
+import general.utility as u
 import general.stan_utility as su
 import pref_looking.plt_analysis as pl
 
@@ -17,6 +18,7 @@ model_path_notau = 'pref_looking/stan_models/image_selection_notau.pkl'
 model_path_notau_eps = 'pref_looking/stan_models/image_selection_notau_eps.pkl'
 model_path_notau_cat = 'pref_looking/stan_models/image_selection_notau_cat.pkl'
 model_path_nt_all = 'pref_looking/stan_models/image_selection_nt_all.pkl'
+model_path_t_all = 'pref_looking/stan_models/image_selection_t_all.pkl'
 
 def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
@@ -145,6 +147,73 @@ def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
                         label='salience')
     return f
 
+def merge_bhvmat_modelfit(data, fit, info_dict, datafield='datafile',
+                          full_model=True, bias_left_name='bias1',
+                          bias_right_name='bias2', sal_name='s',
+                          nov_name='eps', left_img_type_field='leftimg_type',
+                          right_img_type_field='rightimg_type',
+                          novimg_str=b'NovImgList', stan_dict=False,
+                          verbose=False):
+    if full_model:
+        params, mapping = info_dict['all']
+        fit = fit['all'][0]
+    if not stan_dict:
+        fit_dict = su.make_stan_model_dict(fit)
+        if verbose:
+            print('made dict')
+    add_dt_names = ('bias_left', 'bias_right', 'sal_left', 'sal_right',
+                    'nov_left', 'nov_right', 'total_left', 'total_right')
+    curr_names = data.dtype.names
+    all_names = curr_names + add_dt_names
+    dt = {'names':all_names, 'formats':['O']*len(all_names)}
+    x = np.zeros(len(data), dtype=dt)
+    x = u.copy_struct_array(x, data)
+    for i, trl in enumerate(data):
+        day = trl[datafield]
+        day_ind = mapping['day'][1][day]
+        bias_ind = (day_ind,)
+        x[i]['bias_left'] = su.get_stan_params_ind(fit_dict, bias_left_name,
+                                                   bias_ind, stan_dict=True)
+        x[i]['bias_right'] = su.get_stan_params_ind(fit_dict, bias_right_name,
+                                                    bias_ind, stan_dict=True)
+        img_left_name = trl['leftimg']
+        try:
+            img_left_ind = mapping['img'][1][img_left_name] + 1
+            sal_left_ind = (day_ind, img_left_ind)
+            x[i]['sal_left'] = su.get_stan_params_ind(fit_dict, sal_name,
+                                                      sal_left_ind,
+                                                      stan_dict=True)
+        except KeyError:
+            x[i]['sal_left'] = np.nan
+            if verbose:
+                print('no data for {} in {}'.format(img_right_name, day))
+        
+        img_right_name = trl['rightimg']
+        try:
+            img_right_ind = mapping['img'][1][img_right_name] + 1
+            sal_right_ind = (day_ind, img_right_ind)
+            x[i]['sal_right'] = su.get_stan_params_ind(fit_dict, sal_name,
+                                                       sal_right_ind,
+                                                       stan_dict=True)
+        except KeyError:
+            x[i]['sal_right'] = np.nan
+            if verbose:
+                print('no data for {} in {}'.format(img_right_name, day))
+
+        nov_day = su.get_stan_params_ind(fit_dict, nov_name, (day_ind,),
+                                         stan_dict=True)
+
+        left_type = trl[left_img_type_field] == novimg_str
+        x[i]['nov_left'] = nov_day*left_type
+        right_type = trl[right_img_type_field] == novimg_str
+        x[i]['nov_right'] = nov_day*right_type
+        x[i]['total_left'] = (x[i]['bias_left'] + x[i]['sal_left']
+                              + x[i]['nov_left'])
+        x[i]['total_right'] = (x[i]['bias_right'] + x[i]['sal_right']
+                               + x[i]['nov_right'])
+    return x
+        
+
 def _sample_pairs(sals, n=500):
     all_pairs = list(it.combinations(range(len(sals)), 2))
     permuted_pairs = np.random.permutation(all_pairs)
@@ -209,6 +278,10 @@ def _swap_string_for_levels(arr, mapping=None, nonzero=False):
 def _get_common_swap(arrs):
     total_arrs = np.concatenate(arrs)
     lvl_arr, bm, fm = _swap_string_for_levels(total_arrs)
+    output_arrs = _assign_labels(lvl_arr, arrs)
+    return output_arrs, bm, fm
+
+def _assign_labels(lvl_arr, arrs):
     output_arrs = []
     start_ind = 0
     for arr in arrs:
@@ -216,7 +289,26 @@ def _get_common_swap(arrs):
         lvl_a = lvl_arr[start_ind:end_ind]
         output_arrs.append(lvl_a)
         start_ind = end_ind
-    return output_arrs, bm, fm
+    return output_arrs
+
+def _bin_views(arrs, binsize=5, nonzero=True):
+    total_arrs = np.concatenate(arrs)
+    lvl_arr = np.zeros_like(total_arrs)
+    types = np.unique(total_arrs)
+    forw_mapping = {}
+    back_mapping ={}
+    for t in range(min(types), max(types) + 1):
+        bin_ind = int(np.floor((t - min(types))/binsize))
+        if nonzero:
+            bi_key = bin_ind + 1
+        else:
+            bi_key = bin_ind
+        forw_mapping[t] = bi_key
+        back_mapping[bi_key] = t
+        lvl_arr[total_arrs == t] = bi_key
+    nbins = max(back_mapping.keys())
+    output_arrs = _assign_labels(lvl_arr, arrs)
+    return output_arrs, back_mapping, forw_mapping, nbins
 
 def generate_stan_datasets(data, constraint_func, conds=None,
                            run_field='datanum', collapse=False,
@@ -248,6 +340,7 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
                                rv='rightviews', lc='leftimg_type',
                                rc='rightimg_type', drunfield='datafile',
                                outcome_mapping=outcome_mapping,
+                               views_binsize=5,
                                outcome_types=(b'l', b'r', b'o')):
     outcomes = data[outcome]
     valid_outcome_mask = np.isin(outcomes, outcome_types)
@@ -293,11 +386,15 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     mapped_cats = np.array(list([nov_fm[x] for x in img_cats]))
 
     # number of views array
-    views = np.zeros((n, k))    
+    views = np.zeros((n, k), dtype=int)    
     views[:, 0] = data[lv]
     views[:, 1] = data[rv]
+    out = _bin_views((data[lv], data[rv]), binsize=views_binsize)
+    views[:, 0], views[:, 1] = out[0]
+    views_bm, views_fm = out[1], out[2]
+    nbins = out[3]
 
-    param_dict = {'N':n, 'K':k, 'L':l, 'imgs':imgs, 'novs':novs,
+    param_dict = {'N':n, 'K':k, 'L':l, 'V':nbins, 'imgs':imgs, 'novs':novs,
                   'views':views, 'y':outcomes, 'img_cats':mapped_cats,
                   'day':days, 'D':n_days}
     return param_dict, mappings
