@@ -19,6 +19,7 @@ model_path_notau_eps = 'pref_looking/stan_models/image_selection_notau_eps.pkl'
 model_path_notau_cat = 'pref_looking/stan_models/image_selection_notau_cat.pkl'
 model_path_nt_all = 'pref_looking/stan_models/image_selection_nt_all.pkl'
 model_path_t_all = 'pref_looking/stan_models/image_selection_t_all.pkl'
+model_path_vt_all = 'pref_looking/stan_models/image_selection_vt_all.pkl'
 
 def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
