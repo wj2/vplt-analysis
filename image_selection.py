@@ -7,6 +7,7 @@ import re
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 import itertools as it
+import choix as c
 
 import general.plotting as gpl
 import general.utility as u
@@ -150,14 +151,17 @@ def plot_stan_models(model_dict, f=None, fsize=(12,4), lw=10, chains=4,
 
 def merge_bhvmat_modelfit(data, fit, info_dict, datafield='datafile',
                           full_model=True, bias_left_name='bias1',
-                          bias_right_name='bias2', sal_name='s',
+                          bias_right_name='bias2', sal_name='sal',
                           nov_name='eps', left_img_type_field='leftimg_type',
                           right_img_type_field='rightimg_type',
                           novimg_str=b'NovImgList', stan_dict=False,
-                          verbose=False):
+                          verbose=False, left_views='leftviews',
+                          right_views='rightviews', other_mappings=None):
     if full_model:
         params, mapping = info_dict['all']
         fit = fit['all'][0]
+    if other_mappings is not None:
+        mapping.update(other_mappings)
     if not stan_dict:
         fit_dict = su.make_stan_model_dict(fit)
         if verbose:
@@ -180,34 +184,41 @@ def merge_bhvmat_modelfit(data, fit, info_dict, datafield='datafile',
         img_left_name = trl['leftimg']
         try:
             img_left_ind = mapping['img'][1][img_left_name] + 1
-            sal_left_ind = (day_ind, img_left_ind)
+            sal_left_ind = (img_left_ind,)
             x[i]['sal_left'] = su.get_stan_params_ind(fit_dict, sal_name,
                                                       sal_left_ind,
                                                       stan_dict=True)
-        except KeyError:
+        except KeyError as e:
             x[i]['sal_left'] = np.nan
             if verbose:
-                print('no data for {} in {}'.format(img_right_name, day))
+                print('no data for {} in {}'.format(img_left_name, day))
+                print(e)
         
         img_right_name = trl['rightimg']
         try:
             img_right_ind = mapping['img'][1][img_right_name] + 1
-            sal_right_ind = (day_ind, img_right_ind)
+            sal_right_ind = (img_right_ind,)
             x[i]['sal_right'] = su.get_stan_params_ind(fit_dict, sal_name,
                                                        sal_right_ind,
                                                        stan_dict=True)
-        except KeyError:
+        except KeyError as e:
             x[i]['sal_right'] = np.nan
             if verbose:
                 print('no data for {} in {}'.format(img_right_name, day))
-
-        nov_day = su.get_stan_params_ind(fit_dict, nov_name, (day_ind,),
-                                         stan_dict=True)
-
+                print(e)
+        lv = mapping['views'][1][trl[left_views]]
+        nov_left_ind = (day_ind, lv)        
+        nov_left = su.get_stan_params_ind(fit_dict, nov_name, nov_left_ind,
+                                          stan_dict=True)
         left_type = trl[left_img_type_field] == novimg_str
-        x[i]['nov_left'] = nov_day*left_type
+        x[i]['nov_left'] = nov_left*left_type
+
+        rv = mapping['views'][1][trl[right_views]]
+        nov_right_ind = (day_ind, rv)        
+        nov_right = su.get_stan_params_ind(fit_dict, nov_name, nov_right_ind,
+                                           stan_dict=True)
         right_type = trl[right_img_type_field] == novimg_str
-        x[i]['nov_right'] = nov_day*right_type
+        x[i]['nov_right'] = nov_right*right_type
         x[i]['total_left'] = (x[i]['bias_left'] + x[i]['sal_left']
                               + x[i]['nov_left'])
         x[i]['total_right'] = (x[i]['bias_right'] + x[i]['sal_right']
@@ -393,9 +404,58 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     out = _bin_views((data[lv], data[rv]), binsize=views_binsize)
     views[:, 0], views[:, 1] = out[0]
     views_bm, views_fm = out[1], out[2]
+    mappings['views'] = (views_bm, views_fm)
     nbins = out[3]
 
     param_dict = {'N':n, 'K':k, 'L':l, 'V':nbins, 'imgs':imgs, 'novs':novs,
                   'views':views, 'y':outcomes, 'img_cats':mapped_cats,
                   'day':days, 'D':n_days}
     return param_dict, mappings
+
+def generate_pairwise_data(data, limg_field='leftimg', rimg_field='rightimg',
+                           choice_field='first_look', left_choice=b'l',
+                           right_choice=b'r', selection_cfs=None,
+                           limg_kind='leftimg_type', rimg_kind='rightimg_type'):
+    if selection_cfs is not None:
+        data = data[selection_cfs(data)]
+    valid_mask = np.isin(data[choice_field], (right_choice, left_choice))
+    valid_data = data[valid_mask]
+    out = _get_common_swap((valid_data[limg_field], valid_data[rimg_field]))
+    labeled_imgs, bm, fm = out
+    left_imgs, right_imgs = labeled_imgs
+    n_imgs = len(out[1].keys())
+    pairwise_data = np.zeros((len(valid_data), 2))
+    left_mask = valid_data[choice_field] == left_choice
+    right_mask = valid_data[choice_field] == right_choice
+    pairwise_data[left_mask, 0] = left_imgs[left_mask]
+    pairwise_data[left_mask, 1] = right_imgs[left_mask]
+    pairwise_data[right_mask, 0] = right_imgs[right_mask]
+    pairwise_data[right_mask, 1] = left_imgs[right_mask]
+
+    all_imgs = np.concatenate((valid_data[limg_field], valid_data[rimg_field]))
+    all_cats = np.concatenate((valid_data[limg_kind], valid_data[rimg_kind]))
+    unique_imgs, img_inds = np.unique(all_imgs, return_index=True)
+    img_cats = all_cats[img_inds]
+    
+    return pairwise_data, n_imgs, bm, fm, img_cats
+
+def get_pairwise_ranking_map(pw_data, n, alpha=1e-06, n_boots=100, **kwargs):
+    return _bootstrap_pairwise_map(pw_data, n, alpha, c.opt_pairwise, n_boots,
+                                   **kwargs)
+
+def get_pairwise_ranking_mm(pw_data, n, alpha=1e-06, n_boots=100,
+                            max_iter=10**6, **kwargs):
+    return _bootstrap_pairwise_map(pw_data, n, alpha, c.mm_pairwise, n_boots,
+                                   max_iter=max_iter, **kwargs)
+
+def _bootstrap_pairwise_map(pw_data, n, alpha, func, n_boots=100, **kwargs):
+    pw_data = pw_data.astype(int)
+    pw_func = lambda x: func(n, x, alpha=alpha, **kwargs)
+    params = u.bootstrap_list(pw_data, pw_func, out_shape=(n,), n=n_boots)
+    return params    
+
+def get_pairwise_ranking_post(pw_data, n, alpha=1e-06, **kwargs):
+    pw_data = pw_data.astype(int)
+    params, params_cov = c.ep_pairwise(n, pw_data, alpha, **kwargs)
+    return params, params_cov
+
