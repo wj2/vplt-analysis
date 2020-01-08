@@ -97,6 +97,15 @@ rufus_bhv_model = u.make_trial_constraint_func(('trial_type', 'TrialError',
                                                (rufus_plt_conds_norw, 0, 180), 
                                                (np.isin, np.equal, np.equal),
                                                combfunc=np.logical_and)
+rufus_plt = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+                                         (rufus_plt_conds_norw, 0), 
+                                         (np.isin, np.equal),
+                                         combfunc=np.logical_and)
+rufus_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+                                          (rufus_sdms_conds_norw, 0), 
+                                          (np.isin, np.equal),
+                                          combfunc=np.logical_and)
+
 
 ## sdmst
 fam_targ_in = u.make_trial_constraint_func(('trial_type', 'TrialError'),
@@ -170,6 +179,13 @@ novin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
                                              0),
                                             (np.isin, np.equal, np.equal,
                                              np.equal))
+novin_saccout = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((nf_plt_r, nn_plt_r), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
 famin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
                                              'angular_separation',
                                              'TrialError'),
@@ -177,6 +193,13 @@ famin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
                                              0),
                                             (np.isin, np.equal, np.equal,
                                              np.equal))
+famin_saccout = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((fn_plt_r, ff_plt_r), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
 novout_saccout = u.make_trial_constraint_func(('trial_type', 'right_first',
                                                'angular_separation',
                                                'TrialError'),
