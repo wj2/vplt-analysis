@@ -324,7 +324,6 @@ def plot_strength_selective(ind_dict, xs, labels, sig_colors=None,
         ax.set_ylabel(k)
         ax.set_xlabel(xlabel)
 
-
 def organize_indices(data, labels):
     fin, nin, fout, nout, sin, sout = data
     pairs = ((nin, fin), (nout, fout), (sin, sout))
@@ -415,28 +414,35 @@ def plot_prop_figure(ind_dicts, xs, n_labels, labels, color_dict=None,
     return f_prop
 
 def plot_single_unit_eg(ns, xs, neur_key, labels, colors=None, linestyles=None,
-                        ax=None, title=False, legend=True, alphas=None):
+                        ax=None, title=False, legend=True, alphas=None,
+                        error_func=gpl.sem):
     if ax is None:
         ax = f.add_subplot(1,1,1)
     if alphas is None:
         alphas = (1,)*len(ns)
+    if linestyles is None:
+        linestyles = (None,)*len(ns)
+    if colors is None:
+        colors = (None,)*len(ns)
     for i, n in enumerate(ns):
         neuron_n = n[neur_key]
         _ = gpl.plot_trace_werr(xs, neuron_n, ax=ax, label=labels[i],
-                                color=colors[i], legend=legend,
-                                linestyle=linestyles[i], line_alpha=alphas[i])
+                                color=colors[i], legend=legend, 
+                                linestyle=linestyles[i], line_alpha=alphas[i],
+                                error_func=error_func)
     if title:
         ax.set_title(neur_key)
     return ax
 
 def plot_several_single_units(ns, xs, neur_keys, labels, colors=None,
                               linestyles=None, same_fig=True, figsize=(7, 3.5),
-                              suptitle=None, title=False,
+                              suptitle=None, title=False, error_func=gpl.sem,
                               xlabel='time from image onset (ms)',
                               ylabel='spks/second', alphas=None,
                               suptitle_templ='{} single unit examples',
                               file_templ='su_eg_{}.svg', folder='', save=False):
     if same_fig:
+        figsize = (figsize[0], figsize[1]*len(neur_keys))
         f, axs = plt.subplots(len(neur_keys), 1, figsize=figsize, sharex=True,
                               sharey=True)
     if alphas is None:
@@ -453,7 +459,7 @@ def plot_several_single_units(ns, xs, neur_keys, labels, colors=None,
             legend = False
         ax = plot_single_unit_eg(ns, xs, nk, labels, colors, linestyles,
                                  ax=ax, title=title, legend=legend,
-                                 alphas=alphas)
+                                 alphas=alphas, error_func=error_func)
         ax.set_ylabel(ylabel)
         if i == len(neur_keys) - 1:
             ax.set_xlabel(xlabel)
