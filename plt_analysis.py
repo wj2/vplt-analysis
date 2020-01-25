@@ -5,6 +5,7 @@ import general.utility as u
 import general.neural_analysis as na
 import general.plotting as gpl
 import pref_looking.bias as b
+from sklearn import svm
 
 def nanmean_axis1(x):
     return np.nanmean(x, axis=1)
@@ -141,12 +142,25 @@ def get_feat_tuning_index(a, b, boots=1000, ind_func=u.index_func,
         b_samp = u.resample_on_axis(b, n_rs, axis=0,
                                     with_replace=with_replace)
         inds[i] = ind_func(a_samp, b_samp)
-    p_high = np.sum(inds > 0, axis=0).reshape((1, -1))/boots
-    p_low =  np.sum(inds < 0, axis=0).reshape((1, -1))/boots
+    p_high = np.sum(inds >= 0, axis=0).reshape((1, -1))/boots
+    p_low =  np.sum(inds <= 0, axis=0).reshape((1, -1))/boots
     p_arr = np.concatenate((p_high, p_low), axis=0)
     p = np.min(p_arr, axis=0)
     p[np.all(np.isnan(inds), axis=0)] = np.nan
     return inds, p
+
+def get_sus_tuning_data(afunc, bfunc, data, mfunc, start_time, end_time,
+                        binsize, binstep, boots=1000, ind_func=u.index_func,
+                        min_trials=15, min_spks=1, zscore=True,
+                        collapse_time_zscore=False):
+    out = na.organize_spiking_data(data, (afunc, bfunc), (mfunc,)*2,
+                                   start_time, end_time, binsize, binstep,
+                                   min_trials=min_trials, min_spks=min_spks,
+                                   zscore=zscore,
+                                   collapse_time_zscore=collapse_time_zscore)
+    (a_pop, b_pop), xs = out
+    out = get_sus_tuning(a_pop, b_pop, boots=boots, ind_func=ind_func)
+    return out, xs
 
 def get_sus_tuning(a_pop, b_pop, boots=1000, ind_func=u.index_func,
                    with_replace=True):
@@ -155,11 +169,13 @@ def get_sus_tuning(a_pop, b_pop, boots=1000, ind_func=u.index_func,
     n_nrs = len(ks)
     inds = np.zeros((n_nrs, boots, n_ts))
     ps = np.zeros((n_nrs, n_ts))
+    store_ks = np.zeros(n_nrs, dtype=tuple)
     for i, k in enumerate(ks):
         inds[i], ps[i] = get_feat_tuning_index(a_pop[k], b_pop[k], boots=boots,
                                                ind_func=ind_func,
                                                with_replace=with_replace)
-    return inds, ps
+        store_ks[i] = k
+    return inds, ps, store_ks
 
 def get_index_pairs(pop_pairs, labels, boots=1000, ind_func=u.index_func,
                     with_replace=True, axs=None, temporal_func=nanmean_axis1):
@@ -475,6 +491,10 @@ def svm_decoding_helper(data_dict, min_trials=10, resample=100,
                         dec_pair_labels=None, shuffle=False,
                         kernel='linear', **params):
     out_dicts = {}
+    if kernel == 'linear':
+        model = svm.LinearSVC
+    else:
+        model = svm.SVC
     for i, kv in enumerate(data_dict.items()):
         label, data = kv
         for j, p in enumerate(data):
@@ -487,7 +507,7 @@ def svm_decoding_helper(data_dict, min_trials=10, resample=100,
             cat1, cat2 = p
             dec = na.svm_decoding(cat1, cat2, require_trials=min_trials, 
                                   resample=resample, shuff_labels=shuffle,
-                                  kernel=kernel, **params)
+                                  kernel=kernel, model=model, **params)
             out_dicts[pl][label] = dec
     return out_dicts
 

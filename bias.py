@@ -2,7 +2,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from general.utility import *
-import general.plotting as gpl
 import pref_looking.eyes as es
 
 nn_cond = 9
@@ -109,7 +108,7 @@ def quantify_bias(bhv, lc, rc, wid=3, hei=3, centoffset=(0, 0),
                                leftconds=(cond_nf,), 
                                use_bhv_img_params=use_bhv_img_params,
                                centoffset=centoffset)
-    gpl.plot_trace_werr(pxs, d, ax=ax_bias, label=prefix_title[:-2])
+    # gpl.plot_trace_werr(pxs, d, ax=ax_bias, label=prefix_title[:-2])
     print(max(np.mean(d, axis=0))*(1000/bias_win))
     return (frac, dist, lb, hb), (p, e, pxs)
 
@@ -297,7 +296,8 @@ def pref_dispref_distrib(look_courses, xs, winsize=50., winstep=1.):
 
 def get_look_img(trials, left_ind, right_ind, off_ind, left_cent=(-3, 0), 
                  right_cent=(3, 0), img_wid=4, img_hei=4, fix_time=500, 
-                 tlen=5000, use_bhv_img_params=False, centoffset=(0,0)):
+                 tlen=5000, use_bhv_img_params=False, centoffset=(0,0),
+                 eye_field=eye_field, eyemove_flag=eyemove_flag):
     all_eyes = np.zeros((len(trials), fix_time+tlen, 3))
     for i, t in enumerate(trials):
         if use_bhv_img_params:

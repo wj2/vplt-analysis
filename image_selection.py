@@ -21,6 +21,7 @@ model_path_notau_cat = 'pref_looking/stan_models/image_selection_notau_cat.pkl'
 model_path_nt_all = 'pref_looking/stan_models/image_selection_nt_all.pkl'
 model_path_t_all = 'pref_looking/stan_models/image_selection_t_all.pkl'
 model_path_vt_all = 'pref_looking/stan_models/image_selection_vt_all.pkl'
+model_path_timebias = 'pref_looking/stan_models/looking_bias.pkl'
 
 def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
@@ -352,18 +353,27 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
                                rv='rightviews', lc='leftimg_type',
                                rc='rightimg_type', drunfield='datafile',
                                outcome_mapping=outcome_mapping,
-                               views_binsize=5,
-                               outcome_types=(b'l', b'r', b'o')):
-    outcomes = data[outcome]
-    valid_outcome_mask = np.isin(outcomes, outcome_types)
-    outcomes = outcomes[valid_outcome_mask]
+                               views_binsize=5, look_left='on_left_img',
+                               look_right='on_right_img', start_count=75,
+                               count_len=200, outcome_types=(b'l', b'r', b'o'),
+                               outcome_type='saccade'):
+    mappings = {}
+    if outcome_type == 'saccade':
+        outcomes = data[outcome]
+        valid_outcome_mask = np.isin(outcomes, outcome_types)
+        outcomes = outcomes[valid_outcome_mask]
+        out = _swap_string_for_levels(outcomes, mapping=outcome_mapping)
+        outcomes, outcome_bm, outcome_fm = out
+        mappings['outcomes'] = (outcome_bm, outcome_fm)
+        data = data[valid_outcome_mask]
+    elif outcome_type == 'bias':
+        end_count = start_count + count_len
+        look_diffs = [np.sum(trl[start_count:end_count])
+                      - np.sum(data[look_right][i][start_count:end_count])
+                      for i, trl in enumerate(data[look_left])]
+        outcomes = np.array(list(look_diffs))/count_len
     n = len(outcomes)
     k = len(outcome_types)
-    mappings = {}
-    out = _swap_string_for_levels(outcomes, mapping=outcome_mapping)
-    outcomes, outcome_bm, outcome_fm = out
-    mappings['outcomes'] = (outcome_bm, outcome_fm)
-    data = data[valid_outcome_mask]
 
     # days array
     days = data[drunfield]

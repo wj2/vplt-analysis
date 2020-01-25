@@ -35,9 +35,23 @@ def create_parser():
                         help='variance of variance for image salience prior')
     parser.add_argument('--salience_var_mean', default=0, type=float,
                         help='mean of variance for image salience prior')
+    parser.add_argument('--salience_mean_var', default=15, type=float,
+                        help='variance of variance for image salience prior')
+    parser.add_argument('--salience_mean_mean', default=0, type=float,
+                        help='mean of variance for image salience prior')
+    parser.add_argument('--bias_var_var', default=15, type=float,
+                        help='variance of variance for looking bias prior')
+    parser.add_argument('--bias_var_mean', default=0, type=float,
+                        help='mean of variance for looking bias prior')
     parser.add_argument('-m', '--model_path', type=str,
                         default=None, help='path to stan '
                         'model to fit')
+    parser.add_argument('--outcome', default='saccade', help='outcome type to '
+                        'use (default is first saccade)')
+    parser.add_argument('--start_count', default=100, help='start counting '
+                        'image fixation for bias outcome')
+    parser.add_argument('--count_len', default=400, help='how long to count '
+                        'for for bias outcome')
     parser.add_argument('--not_parallel', default=False, action='store_true',
                         help='do not run in parallel (done by default)')
     parser.add_argument('--runfolder', default='./', type=str,
@@ -84,28 +98,43 @@ if __name__ == '__main__':
     
     import pref_looking.image_selection as select
     import general.stan_utility as su
-    if args.model_path is None:
+    if args.model_path is None and args.outcome == 'saccade':
         args.model_path = select.model_path_notau
+    elif args.model_path is None and args.outcome == 'bias':
+        args.model_path = select.model_path_timebias
+
+    if args.outcome == 'saccade':
+        mult = 1
+    elif args.outcome == 'bias':
+        mult = 0
     
     selection_cfs = d.rufus_bhv_model
 
     collapse = args.full_data
     out = select.generate_stan_datasets(data_we, selection_cfs, pdict,
-                                        collapse=collapse)
+                                        collapse=collapse,
+                                        outcome_type=args.outcome,
+                                        start_count=args.start_count,
+                                        count_len=args.count_len)
     run_dict, analysis_dict = out
 
     pbvv = args.side_bias_var_var
     pbvm = args.side_bias_var_mean
     pbmv = args.side_bias_mean_var
-    pbmm = args.side_bias_mean_mean
+    pbmm = args.side_bias_mean_mean*mult
 
     pevv = args.nov_bias_var_var
     pevm = args.nov_bias_var_mean
     pemv = args.nov_bias_mean_var
-    pemm = args.nov_bias_mean_mean
+    pemm = args.nov_bias_mean_mean*mult
     
+    psmv = args.salience_mean_var
+    psmm = args.salience_mean_mean
     psvv = args.salience_var_var
-    psvm = args.salience_var_mean
+    psvm = args.salience_var_mean*mult
+
+    plvm = args.bias_var_mean
+    plvv = args.bias_var_var
 
     model_path = args.model_path
 
@@ -113,7 +142,10 @@ if __name__ == '__main__':
                   'prior_bias_mean_var':pbmv, 'prior_bias_mean_mean':pbmm,
                   'prior_salience_var_var':psvv, 'prior_salience_var_mean':psvm,
                   'prior_eps_mean_mean':pemm, 'prior_eps_mean_var':pemv, 
-                  'prior_eps_var_mean':pevm, 'prior_eps_var_var':pevv}
+                  'prior_eps_var_mean':pevm, 'prior_eps_var_var':pevv,
+                  'prior_look_var_mean':plvm, 'prior_look_var_var':plvv,
+                  'prior_salience_mean_mean':psmm,
+                  'prior_salience_mean_var':psmv}
 
     control_dict = {'adapt_delta':args.adapt_delta,
                     'max_treedepth':args.max_treedepth}
