@@ -48,10 +48,10 @@ def create_parser():
                         'model to fit')
     parser.add_argument('--outcome', default='saccade', help='outcome type to '
                         'use (default is first saccade)')
-    parser.add_argument('--start_count', default=100, help='start counting '
-                        'image fixation for bias outcome')
-    parser.add_argument('--count_len', default=400, help='how long to count '
-                        'for for bias outcome')
+    parser.add_argument('--start_count', default=100, type=int,
+                        help='start counting image fixation for bias outcome')
+    parser.add_argument('--count_len', type=int, default=400,
+                        help='how long to count for for bias outcome')
     parser.add_argument('--not_parallel', default=False, action='store_true',
                         help='do not run in parallel (done by default)')
     parser.add_argument('--runfolder', default='./', type=str,
