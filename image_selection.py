@@ -7,7 +7,6 @@ import re
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 import itertools as it
-import choix as c
 
 import general.plotting as gpl
 import general.utility as u
@@ -448,24 +447,4 @@ def generate_pairwise_data(data, limg_field='leftimg', rimg_field='rightimg',
     img_cats = all_cats[img_inds]
     
     return pairwise_data, n_imgs, bm, fm, img_cats
-
-def get_pairwise_ranking_map(pw_data, n, alpha=1e-06, n_boots=100, **kwargs):
-    return _bootstrap_pairwise_map(pw_data, n, alpha, c.opt_pairwise, n_boots,
-                                   **kwargs)
-
-def get_pairwise_ranking_mm(pw_data, n, alpha=1e-06, n_boots=100,
-                            max_iter=10**6, **kwargs):
-    return _bootstrap_pairwise_map(pw_data, n, alpha, c.mm_pairwise, n_boots,
-                                   max_iter=max_iter, **kwargs)
-
-def _bootstrap_pairwise_map(pw_data, n, alpha, func, n_boots=100, **kwargs):
-    pw_data = pw_data.astype(int)
-    pw_func = lambda x: func(n, x, alpha=alpha, **kwargs)
-    params = u.bootstrap_list(pw_data, pw_func, out_shape=(n,), n=n_boots)
-    return params    
-
-def get_pairwise_ranking_post(pw_data, n, alpha=1e-06, **kwargs):
-    pw_data = pw_data.astype(int)
-    params, params_cov = c.ep_pairwise(n, pw_data, alpha, **kwargs)
-    return params, params_cov
 
