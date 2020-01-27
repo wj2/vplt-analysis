@@ -12,8 +12,6 @@ data {
   real prior_eps_mean_var;
   real<lower=0> prior_eps_var_var;
 
-  real<lower=0> prior_salience_mean_mean;
-  real<lower=0> prior_salience_mean_var;
   real prior_salience_var_mean;
   real<lower=0> prior_salience_var_var;
   real prior_bias_mean_mean;
@@ -33,7 +31,6 @@ data {
 
 parameters {
   // prior-related
-  real<lower=0> salience_mean;
   real<lower=0> salience_var;
   real bias_mean;
   real<lower=0> bias_var;
@@ -55,7 +52,7 @@ transformed parameters {
   vector<lower=0>[D] look_var;
   eps = eps_mean + eps_var*to_matrix(eps_raw);
   bias = bias_mean + bias_var*bias_raw;
-  sal = salience_mean + salience_var*sal_raw;
+  sal = salience_var*sal_raw;
   look_var = look_var_var*look_var_raw;
 }
 
@@ -68,7 +65,6 @@ model {
   vector[2] oe;
 
   // priors
-  salience_mean ~ normal(prior_salience_mean_mean, prior_salience_mean_var);
   salience_var ~ normal(prior_salience_var_mean, prior_salience_var_var);
   bias_var ~ normal(prior_bias_var_mean, prior_bias_var_var);
   bias_mean ~ normal(prior_bias_mean_mean, prior_bias_mean_var);
