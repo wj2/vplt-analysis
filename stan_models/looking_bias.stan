@@ -48,7 +48,7 @@ parameters {
 transformed parameters {
   vector[D] bias;
   matrix[D, V] eps;
-  vector<lower=0>[L] sal;
+  vector[L] sal;
   vector<lower=0>[D] look_var;
   eps = eps_mean + eps_var*to_matrix(eps_raw);
   bias = bias_mean + bias_var*bias_raw;
