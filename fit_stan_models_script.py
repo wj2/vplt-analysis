@@ -36,9 +36,9 @@ def create_parser():
     parser.add_argument('--salience_var_mean', default=0, type=float,
                         help='mean of variance for image salience prior')
     parser.add_argument('--salience_mean_var', default=15, type=float,
-                        help='variance of variance for image salience prior')
+                        help='variance of mean for image salience prior')
     parser.add_argument('--salience_mean_mean', default=0, type=float,
-                        help='mean of variance for image salience prior')
+                        help='mean of mean for image salience prior')
     parser.add_argument('--bias_var_var', default=15, type=float,
                         help='variance of variance for looking bias prior')
     parser.add_argument('--bias_var_mean', default=0, type=float,
@@ -160,5 +160,6 @@ if __name__ == '__main__':
     dt = str(datetime.datetime.now()).replace(' ', '-')
     fname = args.output_pattern.format(monkey_key, dt)
     fname = os.path.join(args.outfolder, fname)
-    out_dict = {'analysis':analysis_dict, 'models':fit_models, 'info':run_dict}
+    out_dict = {'analysis':analysis_dict, 'models':fit_models, 'info':run_dict,
+                'args':args}
     p.dump(out_dict, open(fname, 'wb'))
