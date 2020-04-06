@@ -126,6 +126,12 @@ nov_dist_in = u.make_trial_constraint_func(('trial_type', 'TrialError'),
                                            combfunc=np.logical_and)
 
 ## plt
+plt_far = u.make_trial_constraint_func(('trial_type',
+                                        'angular_separation',
+                                        'TrialError'),
+                                       (rufus_plt_conds_norw, 180, 0),
+                                       (np.isin, np.equal, np.equal))
+
 plt_sacc_in = u.make_trial_constraint_func(('trial_type', 'left_first',
                                             'angular_separation',
                                             'TrialError'),

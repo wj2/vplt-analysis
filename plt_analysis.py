@@ -181,7 +181,7 @@ def get_index_pairs(pop_pairs, labels, boots=1000, ind_func=u.index_func,
                     with_replace=True, axs=None, temporal_func=nanmean_axis1):
     inds_dict = {}
     for i, pp in enumerate(pop_pairs):
-        inds, ps = get_sus_tuning(pp[0], pp[1], boots=boots, ind_func=ind_func,
+        inds, ps, _ = get_sus_tuning(pp[0], pp[1], boots=boots, ind_func=ind_func,
                                   with_replace=with_replace)
         inds_dict[labels[i]] = (inds, ps)
     return inds_dict
@@ -491,10 +491,7 @@ def svm_decoding_helper(data_dict, min_trials=10, resample=100,
                         dec_pair_labels=None, shuffle=False,
                         kernel='linear', **params):
     out_dicts = {}
-    if kernel == 'linear':
-        model = svm.LinearSVC
-    else:
-        model = svm.SVC
+    model = svm.SVC
     for i, kv in enumerate(data_dict.items()):
         label, data = kv
         for j, p in enumerate(data):
@@ -511,16 +508,23 @@ def svm_decoding_helper(data_dict, min_trials=10, resample=100,
             out_dicts[pl][label] = dec
     return out_dicts
 
-def plot_svm_decoding(results_dict, xs, figsize=None, colordict=None, ax=None):
+def plot_svm_decoding(results_dict, xs, figsize=None, colordict=None, ax=None,
+                      color=None, legend=True, shuffled_results=None):
     if ax is None:
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(1,1,1)
     for k, data in results_dict.items():
         if colordict is not None:
             color = colordict[k]
+        if legend:
+            label = k
         else:
-            color = None
-        gpl.plot_trace_werr(xs, data[0], color=color, ax=ax, label=k,
+            label = ''
+        tcs = data[0]
+        if shuffled_results is not None:
+            tcs_shuff = shuffled_results[k][0]
+            tcs = tcs - np.expand_dims(np.mean(tcs_shuff, axis=0), 0)
+        gpl.plot_trace_werr(xs, tcs, color=color, ax=ax, label=label,
                             error_func=gpl.conf95_interval)
     return ax
     
