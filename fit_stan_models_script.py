@@ -108,7 +108,7 @@ if __name__ == '__main__':
     elif args.outcome == 'bias':
         mult = 0
     
-    selection_cfs = d.rufus_bhv_model
+    selection_cfs = d.bhv_models[monkey_key]
 
     collapse = args.full_data
     out = select.generate_stan_datasets(data_we, selection_cfs, pdict,

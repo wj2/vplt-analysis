@@ -36,7 +36,9 @@ in_plt_b = 12
 ni_plt_b = 13
 fi_plt_b = 14
 if_plt_b = 15
-bootsy_plt_conds_norw = (fn_plt_b, ff_plt_b, nn_plt_b, nf_plt_b)
+bootsy_plt_conds_norw = (fn_plt_b, ff_plt_b, nn_plt_b, nf_plt_b, ii_plt_b,
+                         in_plt_b, ni_plt_b, fi_plt_b, if_plt_b)
+bootsy_plt_conds_norw_noi = (fn_plt_b, ff_plt_b, nn_plt_b, nf_plt_b)
 bootsy_sdms_conds_norw = ()
 
 fn_plt_s = 10
@@ -48,7 +50,8 @@ in_plt_s = 12
 ni_plt_s = 13
 fi_plt_s = 14
 if_plt_s = 15
-stan_plt_conds_norw = (fn_plt_s, ff_plt_s, nn_plt_s, nf_plt_s)
+stan_plt_conds_norw = (fn_plt_s, ff_plt_s, nn_plt_s, nf_plt_s) # , ii_plt_s,
+                       # in_plt_s, ni_plt_s, fi_plt_s, if_plt_s)
 stan_sdms_conds_norw = ()
 
 d1_xy_bootsy = (-3.5, 0)
@@ -90,12 +93,19 @@ rufus_sdms_conds_norw = (fn_sdms1_r, fn_sdms2_r, ff_sdms1_r, ff_sdms2_r,
                          fr_sdms1_r, fr_sdms2_r)
 
 # Constraint functions
-
 ## behavior model
 rufus_bhv_model = u.make_trial_constraint_func(('trial_type', 'TrialError',
                                                 'angular_separation'),
                                                (rufus_plt_conds_norw, 0, 180), 
                                                (np.isin, np.equal, np.equal),
+                                               combfunc=np.logical_and)
+stan_bhv_model = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+                                               (stan_plt_conds_norw, 0), 
+                                               (np.isin, np.equal),
+                                               combfunc=np.logical_and)
+bootsy_bhv_model = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+                                               (bootsy_plt_conds_norw_noi, 0), 
+                                               (np.isin, np.equal),
                                                combfunc=np.logical_and)
 rufus_plt = u.make_trial_constraint_func(('trial_type', 'TrialError'),
                                          (rufus_plt_conds_norw, 0), 
@@ -105,6 +115,10 @@ rufus_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
                                           (rufus_sdms_conds_norw, 0), 
                                           (np.isin, np.equal),
                                           combfunc=np.logical_and)
+
+bhv_models = {'Rufus':rufus_bhv_model, 'Stan':stan_bhv_model,
+              'Bootsy':bootsy_bhv_model}
+
 
 
 ## sdmst
