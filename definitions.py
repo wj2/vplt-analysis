@@ -1,6 +1,9 @@
 import general.utility as u
 import numpy as np
 
+nov_color = (.7, .4, .4)
+fam_color = (.4, .4, .7)
+
 # lip dates
 lip_dates = ['09272017', '10162017', '10242017', '10302017', '10312017',
              '11012017', '11022017', '11032017', '11092017', '11302017',
