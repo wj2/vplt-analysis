@@ -102,8 +102,10 @@ if __name__ == '__main__':
         args.model_path = select.model_path_notau
     elif args.model_path is None and args.outcome == 'bias':
         args.model_path = select.model_path_timebias
+    elif args.model_path is None and args.outcome == 'structure':
+        args.model_path = select.model_path_structure
 
-    if args.outcome == 'saccade':
+    if args.outcome == 'saccade' or args.outcome == 'structure':
         mult = 1
     elif args.outcome == 'bias':
         mult = 0
