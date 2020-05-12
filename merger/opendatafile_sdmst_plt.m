@@ -1,4 +1,5 @@
-function data = opendatafile_dimming_task(nex_file, bhvfile, readLFP, readWaveforms, save_file, imglog, nex_offset)
+function data = opendatafile_sdmst_plt(nex_file, bhvfile, readLFP, readWaveforms, save_file, ...
+    imglog, nex_offset, eventsFile)
 %May select either a bhv or a nex file, this program will load that file
 %along with the corresponding nex or bhv file (file names must be
 %identical).  Must call this function before calling nexgetspike.
@@ -10,6 +11,7 @@ function data = opendatafile_dimming_task(nex_file, bhvfile, readLFP, readWavefo
 
 verify = 1;
 only_waveform_means = 1; % save just the waveform means, not all the waveforms
+only_good = 1;
 
 knownfiles = {'nex'};
 BHV = [];
@@ -57,7 +59,7 @@ NEURO.CodeTimes = [];
 NEURO.CodeNumbers = [];
 NEURO.LFP = [];
 
-if strfind(filetype, 'nex'),
+if contains(filetype, 'nex'),
     NEURO.File
     [fh vh d] = nex_read(NEURO.File, readLFP);
     vn = cat(1, {vh.Name});
@@ -188,6 +190,27 @@ if strfind(filetype, 'nex'),
             lasttime = max([lasttime max(NEURO.Neuron.(vh(k).Name))]);
         end
     end
+elseif contains(filetype, 'mat')
+    ndata = load(NEURO.File).rez;
+    spiketimes = ndata.st3(:, 1);
+    neuronids = ndata.st3(:, 2);
+    good_neurons = logical(ndata.good);
+    uniqueIDs = 1:size(good_neurons, 1);
+    if only_good
+        uniqueIDs = uniqueIDs(good_neurons);
+    end
+    freq = ndata.ops.fs;
+    for i = 1:length(uniqueIDs)
+        id = uniqueIDs(i);
+        label = strcat('CLUSTER', num2str(id));
+        spks = spiketimes(id == neuronids);
+        NEURO.Neuron.(label) = round(1000*spks/freq);
+    end
+    events = load(eventsFile).Neuro;
+    NEURO.CodeTimes = events.Ts;
+    NEURO.CodeNumbers = events.Strobed;
+else
+    fprintf('filetype %s not recognized.', filetype);
 end
 
 if exist(bhvfile, 'file'),
