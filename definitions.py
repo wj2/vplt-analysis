@@ -23,6 +23,11 @@ nr_plt_r = 25
 rf_plt_r = 26
 fr_plt_r = 27
 
+lh_plt_r = 28
+ll_plt_r = 29
+hh_plt_r = 30
+hl_plt_r = 31
+
 plt_cond_dict = {'cond_ff':ff_plt_r, 'cond_nn':nn_plt_r, 'cond_fn':fn_plt_r, 
                  'cond_nf':nf_plt_r}
 plt_rw_f_cond_dict = {'cond_ff':ff_plt_r, 'cond_nn':rr_plt_r, 'cond_fn':fr_plt_r,
@@ -88,7 +93,8 @@ fr_sdms1_r = 17
 fr_sdms2_r = 18
 
 rufus_plt_conds_norw = (fn_plt_r, ff_plt_r, nn_plt_r, nf_plt_r, rr_plt_r,
-                        rn_plt_r, nr_plt_r, rf_plt_r, fr_plt_r)
+                        rn_plt_r, nr_plt_r, rf_plt_r, fr_plt_r,)
+                        # hl_plt_r, ll_plt_r, hh_plt_r, lh_plt_r)
 rufus_sdms_conds_norw = (fn_sdms1_r, fn_sdms2_r, ff_sdms1_r, ff_sdms2_r,
                          nn_sdms1_r, nn_sdms2_r, nf_sdms1_r, nf_sdms2_r,
                          rr_sdms1_r, rr_sdms2_r, rn_sdms1_r, rn_sdms2_r,
@@ -194,6 +200,22 @@ fam_in_close = u.make_trial_constraint_func(('trial_type', 'left_first',
                                             (fn_plt_r, True, 45, 0),
                                             (np.equal, np.equal, np.equal,
                                              np.equal))
+
+hlumin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((hl_plt_r, hh_plt_r), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+llumin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((lh_plt_r, ll_plt_r), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+
 
 novin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
                                              'angular_separation',
