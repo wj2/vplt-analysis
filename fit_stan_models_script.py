@@ -136,6 +136,21 @@ if __name__ == '__main__':
     plvm = args.bias_var_mean
     plvv = args.bias_var_var
 
+    pswmm = 1
+    pswmv = 2
+    pswvm = 2
+    pswvv = 2
+    
+    pnwmm = pswmm
+    pnwmv = pswmv
+    pnwvm = pswvm
+    pnwvv = pswvv
+    
+    pbwmm = pswmm
+    pbwmv = pswmv
+    pbwvm = pswvm
+    pbwvv = pswvv
+    
     model_path = args.model_path
 
     prior_dict = {'prior_bias_var_var':pbvv, 'prior_bias_var_mean':pbvm,
@@ -145,7 +160,13 @@ if __name__ == '__main__':
                   'prior_eps_var_mean':pevm, 'prior_eps_var_var':pevv,
                   'prior_look_var_mean':plvm, 'prior_look_var_var':plvv,
                   'prior_salience_mean_mean':psmm,
-                  'prior_salience_mean_var':psmv}
+                  'prior_salience_mean_var':psmv,
+                  'prior_sw_mean_mean':pswmm, 'prior_sw_mean_var':pswmv,
+                  'prior_sw_var_mean':pswvm, 'prior_sw_var_var':pswvv,
+                  'prior_bw_mean_mean':pbwmm, 'prior_bw_mean_var':pbwmv,
+                  'prior_bw_var_mean':pbwvm, 'prior_bw_var_var':pbwvv,
+                  'prior_nw_mean_mean':pnwmm, 'prior_nw_mean_var':pnwmv,
+                  'prior_nw_var_mean':pnwvm, 'prior_nw_var_var':pnwvv}
 
     control_dict = {'adapt_delta':args.adapt_delta,
                     'max_treedepth':args.max_treedepth}
