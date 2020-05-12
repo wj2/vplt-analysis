@@ -91,7 +91,8 @@ if __name__ == '__main__':
     d_r = u.load_collection_bhvmats(datadir, pdict, pattern,
                                     make_log_name=False, max_trials=max_trials,
                                     dates=d.lip_dates,
-                                    forget_imglog=forget_imglog)
+                                    forget_imglog=forget_imglog,
+                                    repl_logpath=imglog_path)
     data = d_r
     data_we = d_r[d_r['TrialError'] == 0]
     
