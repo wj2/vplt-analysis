@@ -10,18 +10,72 @@ from sklearn import svm
 def nanmean_axis1(x):
     return np.nanmean(x, axis=1)
 
+def _make_fixation_mapping(data, sacc_targ='saccade_targ'):
+    all_targ = np.concatenate(data[sacc_targ])
+    options = np.unique(all_targ)
+    ax_map = {o:i for i, o in enumerate(options)}
+    return ax_map
+
+def make_saccade_tree(trs, tree_depth=5, discard_short=False,
+                      sacc_targ='saccade_targ', sacc_len='saccade_lens',
+                      ax_map=None):
+    if ax_map is None:
+        ax_map = _make_fixation_mapping(trs, sacc_targ)
+    n_options = len(ax_map.keys())
+    ns = np.zeros(tree_depth)
+    transition_tree = np.zeros((n_options, n_options, tree_depth - 1))
+    occup_tree = np.zeros((n_options, tree_depth))
+    len_occup_tree = np.zeros((n_options, tree_depth))
+    for i, tr in enumerate(trs):
+        st = tr[sacc_targ]
+        sl = tr[sacc_len]
+        if len(sl) >= tree_depth:
+            td_i = tree_depth
+        elif not discard_short:
+            td_i = len(sl)
+        for i in range(td_i):
+            ns[i] += 1
+            curr = ax_map[st[i]]
+            occup_tree[curr, i] += 1
+            len_occup_tree[curr, i] += sl[i]
+            if i < td_i - 1:
+                next_ = ax_map[st[i+1]]
+                transition_tree[curr, next_, i] += 1
+    return transition_tree, occup_tree, len_occup_tree, ns, ax_map    
+
+def get_nov_fam_tree(data, conds, tree_depth=5, discard_short=False,
+                     sacc_targ='saccade_targ', sacc_len='saccade_lens',
+                     **trial_kwargs):
+    labels = ('n', 'f', 'o')
+    ltrs, rtrs = _get_ltrls_rtrls(data, conds, **trial_kwargs)
+    ax_map_r = {b'l':1, b'r':0, b'o':2}
+    out_r = make_saccade_tree(rtrs, tree_depth, discard_short, sacc_targ,
+                              sacc_len, ax_map_r)
+    tt_r, ot_r, lot_r, ns_r, _ = out_r
+    ax_map_l = {b'l':0, b'r':1, b'o':2}
+    out_l = make_saccade_tree(ltrs, tree_depth, discard_short, sacc_targ,
+                              sacc_len, ax_map_l)
+    tt_l, ot_l, lot_l, ns_l, _ = out_l
+    tt = tt_l + tt_r
+    ot = ot_l + ot_r
+    lot = lot_l + lot_r
+    ns = ns_l + ns_r
+    return tt, ot, lot, ns, labels
+
 def _get_leftright_conds(conds, li, ri, conds_ref='plt_conds'):
     left_conds = (conds[conds_ref][li],)
     right_conds = (conds[conds_ref][ri],)
     return left_conds, right_conds
 
 def _get_ltrls_rtrls(data, conds, trial_type='trial_type', left_ind=3,
-                     right_ind=0):
+                     right_ind=0, noerr=True, errfield='TrialError', errtarg=0):
     left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
-    left_func = u.make_trial_constraint_func((trial_type,), (left_conds,),
-                                             (np.isin,))
-    right_func = u.make_trial_constraint_func((trial_type,), (right_conds,),
-                                              (np.isin,))
+    left_func = u.make_trial_constraint_func((trial_type, errfield),
+                                             (left_conds, errtarg),
+                                             (np.isin, np.equal))
+    right_func = u.make_trial_constraint_func((trial_type, errfield),
+                                              (right_conds, errtarg),
+                                              (np.isin, np.equal))
     l_trls = data[left_func(data)]
     r_trls = data[right_func(data)]
     return l_trls, r_trls
@@ -50,6 +104,30 @@ def get_dwell_distribution(data, conds, trial_type='trial_type', left_ind=3,
         nov_fixes = nov_fixes[nov_fixes < len_limit]
         fam_fixes = fam_fixes[fam_fixes < len_limit]
     return nov_fixes, fam_fixes
+
+def get_look_times_nsacc(data, conds, n, trial_type='trial_type', left_ind=3,
+                            right_ind=0):
+    l_trls, r_trls = _get_ltrls_rtrls(data, conds, trial_type=trial_type,
+                                      left_ind=left_ind, right_ind=right_ind)
+    nov_cumu = []
+    fam_cumu = []
+    for tr in l_trls:
+        if len(tr['saccade_lens']) >= n:
+            n_sacc = tr['saccade_targ'][:n] == b'l'
+            f_sacc = tr['saccade_targ'][:n] == b'r'
+            n_times = tr['saccade_lens'][:n][n_sacc]
+            f_times = tr['saccade_lens'][:n][f_sacc]
+            nov_cumu.append(np.sum(n_times)/n)
+            fam_cumu.append(np.sum(f_times)/n)
+    for tr in r_trls:
+        if len(tr['saccade_lens']) >= n:
+            n_sacc = tr['saccade_targ'][:n] == b'r'
+            f_sacc = tr['saccade_targ'][:n] == b'l'
+            n_times = tr['saccade_lens'][:n][n_sacc]
+            f_times = tr['saccade_lens'][:n][f_sacc]
+            nov_cumu.append(np.sum(n_times)/n)
+            fam_cumu.append(np.sum(f_times)/n)
+    return np.array(nov_cumu), np.array(fam_cumu)
 
 def get_fixation_proportion(data, conds, n, trial_type='trial_type', left_ind=3,
                             right_ind=0):
@@ -456,11 +534,20 @@ def plot_several_single_units(ns, xs, neur_keys, labels, colors=None,
                               xlabel='time from image onset (ms)',
                               ylabel='spks/second', alphas=None,
                               suptitle_templ='{} single unit examples',
-                              file_templ='su_eg_{}.svg', folder='', save=False):
+                              file_templ='su_eg_{}.svg', folder='', save=False,
+                              same_fig_square=False, sharex=True, sharey=False):
     if same_fig:
-        figsize = (figsize[0], figsize[1]*len(neur_keys))
-        f, axs = plt.subplots(len(neur_keys), 1, figsize=figsize, sharex=True,
-                              sharey=True)
+        n = len(neur_keys)
+        if same_fig_square:
+            s = int(np.ceil(np.sqrt(n)))
+            figsize = (figsize[0]*s, figsize[1]*s)
+            f, axs = plt.subplots(s, s, figsize=figsize, sharex=sharex,
+                                  sharey=sharey)
+            axs = axs.flatten()
+        else:
+            figsize = (figsize[0], figsize[1]*len(neur_keys))
+            f, axs = plt.subplots(len(neur_keys), 1, figsize=figsize,
+                                  sharex=sharex, sharey=sharey)
     if alphas is None:
         alphas = (1,)*len(ns)
     for i, nk in enumerate(neur_keys):

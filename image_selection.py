@@ -21,6 +21,7 @@ model_path_nt_all = 'pref_looking/stan_models/image_selection_nt_all.pkl'
 model_path_t_all = 'pref_looking/stan_models/image_selection_t_all.pkl'
 model_path_vt_all = 'pref_looking/stan_models/image_selection_vt_all.pkl'
 model_path_timebias = 'pref_looking/stan_models/looking_bias.pkl'
+model_path_struct = 'pref_looking/stan_models/looking_structure.pkl'
 
 def get_novfam_sal_diff(fit, fit_params, param='s\[.*', central_func=np.mean,
                         sal_central_func=np.mean, nov_val=1, fam_val=0,
@@ -206,23 +207,24 @@ def merge_bhvmat_modelfit(data, fit, info_dict, datafield='datafile',
             if verbose:
                 print('no data for {} in {}'.format(img_right_name, day))
                 print(e)
-        lv = mapping['views'][1][trl[left_views]]
-        nov_left_ind = (day_ind, lv)        
-        nov_left = su.get_stan_params_ind(fit_dict, nov_name, nov_left_ind,
-                                          stan_dict=True)
-        left_type = trl[left_img_type_field] == novimg_str
-        x[i]['nov_left'] = nov_left*left_type
-
-        rv = mapping['views'][1][trl[right_views]]
-        nov_right_ind = (day_ind, rv)        
-        nov_right = su.get_stan_params_ind(fit_dict, nov_name, nov_right_ind,
-                                           stan_dict=True)
-        right_type = trl[right_img_type_field] == novimg_str
-        x[i]['nov_right'] = nov_right*right_type
-        x[i]['total_left'] = (x[i]['bias_left'] + x[i]['sal_left']
-                              + x[i]['nov_left'])
-        x[i]['total_right'] = (x[i]['bias_right'] + x[i]['sal_right']
-                               + x[i]['nov_right'])
+        if trl[left_views] > 0 and trl[right_views] > 0:
+            lv = mapping['views'][1][trl[left_views]]
+            nov_left_ind = (day_ind, lv)        
+            nov_left = su.get_stan_params_ind(fit_dict, nov_name, nov_left_ind,
+                                              stan_dict=True)
+            left_type = trl[left_img_type_field] == novimg_str
+            x[i]['nov_left'] = nov_left*left_type
+            
+            rv = mapping['views'][1][trl[right_views]]
+            nov_right_ind = (day_ind, rv)        
+            nov_right = su.get_stan_params_ind(fit_dict, nov_name, nov_right_ind,
+                                               stan_dict=True)
+            right_type = trl[right_img_type_field] == novimg_str
+            x[i]['nov_right'] = nov_right*right_type
+            x[i]['total_left'] = (x[i]['bias_left'] + x[i]['sal_left']
+                                  + x[i]['nov_left'])
+            x[i]['total_right'] = (x[i]['bias_right'] + x[i]['sal_right']
+                                   + x[i]['nov_right'])
     return x
         
 
@@ -355,7 +357,11 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
                                views_binsize=5, look_left='on_left_img',
                                look_right='on_right_img', start_count=75,
                                count_len=200, outcome_types=(b'l', b'r', b'o'),
-                               outcome_type='saccade'):
+                               outcome_type='saccade', n_sacc_struct=5,
+                               all_saccs='saccade_targ',
+                               left_type='leftimg_type',
+                               right_type='rightimg_type',
+                               novimg_name=b'NovImgList'):
     mappings = {}
     if outcome_type == 'saccade':
         outcomes = data[outcome]
@@ -371,6 +377,18 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
                       - np.sum(data[look_right][i][start_count:end_count])
                       for i, trl in enumerate(data[look_left])]
         outcomes = np.array(list(look_diffs))/count_len
+    elif outcome_type == 'structure':
+        outcomes = data[all_saccs]
+        valid_outcome_mask = [len(o) >= n_sacc_struct for o in outcomes]
+        outcomes = outcomes[valid_outcome_mask]
+        data = data[valid_outcome_mask]
+        full_outcomes = np.zeros((len(outcomes), n_sacc_struct), dtype=int)
+        for i, o in enumerate(outcomes):
+            out = _swap_string_for_levels(o, mapping=outcome_mapping)
+            o_i, outcome_bm, outcome_fm = out
+            full_outcomes[i] = o_i[:n_sacc_struct]
+        mappings['outcomes'] = (outcome_bm, outcome_fm)
+        outcomes = full_outcomes
     n = len(outcomes)
     k = len(outcome_types)
 
@@ -399,6 +417,11 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     nov_bm, nov_fm = out[1], out[2]
     mappings['nov'] = (nov_bm, nov_fm)
 
+    # trial-wise novelty indicator array
+    trial_nov = np.zeros((n, k - 1))
+    trial_nov[:, 0] = data[left_type] == novimg_name
+    trial_nov[:, 1] = data[right_type] == novimg_name
+
     # img novelty
     all_imgs = np.concatenate((data[li], data[ri]))
     all_cats = np.concatenate((data[lc], data[rc]))
@@ -416,9 +439,10 @@ def format_predictors_outcomes(data, outcome='first_look', li='leftimg',
     mappings['views'] = (views_bm, views_fm)
     nbins = out[3]
 
-    param_dict = {'N':n, 'K':k, 'L':l, 'V':nbins, 'imgs':imgs, 'novs':novs,
-                  'views':views, 'y':outcomes, 'img_cats':mapped_cats,
-                  'day':days, 'D':n_days}
+    param_dict = {'N':n, 'K':k, 'L':l, 'V':nbins, 'S':n_sacc_struct,
+                  'imgs':imgs, 'novs':novs, 'views':views, 'y':outcomes,
+                  'img_cats':mapped_cats, 'day':days, 'D':n_days,
+                  'trial_nov':trial_nov}
     return param_dict, mappings
 
 def generate_pairwise_data(data, limg_field='leftimg', rimg_field='rightimg',
