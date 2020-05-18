@@ -50,13 +50,8 @@ parameters {
   real<lower=0> eps_var;
 
   vector[S] sw_mean;
-  vector[S] sw_var;
-  
-  vector[S] nw_mean;
-  vector[S] nw_var;
-  
+  vector[S] nw_mean;  
   vector[S] bw_mean;
-  vector[S] bw_var;
 
   // data-related
   vector[L] sal_raw; // image inherent saliences
@@ -80,12 +75,11 @@ transformed parameters {
   sal = 1 + salience_var*sal_raw;
 
   for (d in 1:D) {
-    sal_weight[:, d] = sw_mean + sw_var .* sal_weight_raw[:, d];
-    nov_weight[:, d] = nw_mean + nw_var .* nov_weight_raw[:, d];
+    sal_weight[:, d] = sw_mean + sal_weight_raw[:, d];
+    nov_weight[:, d] = nw_mean + nov_weight_raw[:, d];
     for (k in 1:K-1) {
       bias_weight[:, d, k] = to_array_1d(bw_mean
-					 + bw_var
-					 .* to_vector(bias_weight_raw[:, d, k]));
+					 + to_vector(bias_weight_raw[:, d, k]));
     }
   }
 }
@@ -104,13 +98,10 @@ model {
   eps_var ~ normal(prior_eps_var_mean, prior_eps_var_var);
 
   sw_mean ~ normal(prior_sw_mean_mean, prior_sw_mean_var);
-  sw_var ~ normal(prior_sw_var_mean, prior_sw_var_var);
 
   nw_mean ~ normal(prior_nw_mean_mean, prior_nw_mean_var);
-  nw_var ~ normal(prior_nw_var_mean, prior_nw_var_var);
 
   bw_mean ~ normal(prior_bw_mean_mean, prior_bw_mean_var);
-  bw_var ~ normal(prior_bw_var_mean, prior_bw_var_var);
   
   sal_raw ~ normal(0, 1);
   for (v in 1:V) {
