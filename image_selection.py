@@ -7,6 +7,7 @@ import re
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 import itertools as it
+import skimage as skimg
 
 import general.plotting as gpl
 import general.utility as u
@@ -226,7 +227,25 @@ def merge_bhvmat_modelfit(data, fit, info_dict, datafield='datafile',
             x[i]['total_right'] = (x[i]['bias_right'] + x[i]['sal_right']
                                    + x[i]['nov_right'])
     return x
-        
+
+def _format_name_like_ml(x):
+    f, _ = os.path.splitext(x)
+    nn = f.encode()
+    return nn
+
+def compute_lowlevel_salience(folder, pattern='.*',
+                              keyfunc=_format_name_like_ml):
+    matchfiles = u.get_matching_files(folder, pattern)
+    import pref_looking.bms.saliency as sal
+    sal_dict = {}
+    for f in matchfiles:
+        name = os.path.join(folder, f)
+        img = skimg.io.imread(name)
+        if len(img.shape) < 3:
+            img = skimg.color.gray2rgb(img)
+        salmap = sal.compute_saliency(img)
+        sal_dict[keyfunc(f)] = salmap
+    return sal_dict
 
 def _sample_pairs(sals, n=500):
     all_pairs = list(it.combinations(range(len(sals)), 2))
