@@ -7,6 +7,8 @@ import general.plotting as gpl
 import pref_looking.bias as b
 import pref_looking.definitions as d
 import pref_looking.image_selection as sel
+import dPCA.dPCA as dPCA
+import itertools
 from sklearn import svm
 
 monkey_paths = {'Stan':'pref_looking/data-stan-itc/',
@@ -180,14 +182,53 @@ def get_side_bias(data):
     side_bias = np.sum(lf)/(np.sum(lf) + np.sum(rf))
     return side_bias
 
-def get_first_saccade_prob_bs(data, *args, n_boots=1000):
-    fsps = u.bootstrap_list(data, lambda x: get_first_saccade_prob(x, *args),
-                            n=n_boots)
+def compute_sdms_performance(data, cgroups, n_boots=1000, errfield='TrialError',
+                             corr=0, incorr=6):
+    corr_func = lambda x: np.sum(x[errfield] == corr)
+    incorr_func = lambda x: np.sum(x[errfield] == incorr)
+    ratio_func = u.make_ratio_function(corr_func, incorr_func)
+    out_dict = {}
+    for key, cgroup in cgroups.items():
+        trs = u.get_only_conds(data, cgroup)
+        c_r = u.bootstrap_list(trs, ratio_func, n=n_boots)
+        c_r = np.array(c_r).reshape((-1, 1))
+        out_dict[key] = c_r
+    return out_dict
+
+def plot_sdms_performance(perf_dict, offset, ax, color=None,
+                          rotate_labels=True):
+    namelist = []
+    for j, (label, perf) in enumerate(perf_dict.items()):
+        gpl.plot_trace_werr(np.array([j]) + offset, perf,
+                            error_func=gpl.conf95_interval, 
+                            ax=ax, fill=False,
+                            color=color)
+        namelist.append(label)
+    ax.set_xticks(range(len(namelist)))
+    ax.set_ylabel('P(correct)')
+    if rotate_labels:
+        ax.set_xticklabels(namelist, rotation=90)
+    else:
+        ax.set_xticklabels(namelist)
+    return ax
+
+
+def get_first_saccade_prob_bs(data, *args, n_boots=1000, remove_errs=True,
+                              errfield='TrialError', angular_separation=180,
+                              ang_field='angular_separation', **kwargs):
+    if remove_errs:
+        data = data[data[errfield] == 0]
+    if angular_separation is not None:
+        data = data[data[ang_field] == angular_separation]
+    f = lambda x: get_first_saccade_prob(x, *args, **kwargs)
+    fsps = u.bootstrap_list(data, f, n=n_boots)
     return fsps
 
 def get_first_saccade_prob(data, conds, trial_type='trial_type',
-                            left_ind=3, right_ind=0):
-    left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
+                           left_ind=3, right_ind=0, conds_ref='plt_conds',
+                           min_trials=0):
+    left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind,
+                                                   conds_ref=conds_ref)
     left_func = u.make_trial_constraint_func((trial_type,), (left_conds,),
                                              (np.isin,))
     right_func = u.make_trial_constraint_func((trial_type,), (right_conds,),
@@ -199,15 +240,22 @@ def get_first_saccade_prob(data, conds, trial_type='trial_type',
     total_r = np.sum(np.logical_or(d_rmask['left_first'],
                                    d_rmask['right_first']))
     total_fs = np.sum(d_lmask['left_first']) + np.sum(d_rmask['right_first'])
-    if total_l + total_r == 0:
+    if total_l + total_r == 0 or total_l + total_r < min_trials:
         first_sacc_prob = np.nan
     else:
         first_sacc_prob = total_fs / (total_l + total_r)
     return first_sacc_prob
 
 def get_bias_timecourse(data, conds, t_begin, t_end, winsize, winstep,
-                         left_ind=3, right_ind=0):
-    left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind)
+                        left_ind=3, right_ind=0, remove_errs=True,
+                        errfield='TrialError', conds_ref='plt_conds',
+                        angular_separation=180, ang_field='angular_separation'):
+    if remove_errs:
+        data = data[data[errfield] == 0]
+    if angular_separation is not None:
+        data = data[data[ang_field] == angular_separation]
+    left_conds, right_conds = _get_leftright_conds(conds, left_ind, right_ind,
+                                                   conds_ref=conds_ref)
     out = b.get_bias_tc(data, left_conds, right_conds, use_bhv_img_params=True,
                         winsize=winsize, winstep=winstep, fix_time=-t_begin,
                         tlen=t_end)
@@ -545,6 +593,110 @@ def compile_saccade_latencies(d, dfuncs, latt_groups, saccfield='first_sacc_time
         storage[ind].append(d_i[saccfield] - d_i[fixoff_field])
     return storage
 
+def compute_average_diff(neurs, xs, x_pt, cent_func=np.mean):
+    x_ind = np.argmin(np.abs(xs - x_pt))
+    assert len(neurs) == 2
+    diffs = {}
+    for n_key, spks1 in neurs[0].items():
+        spks2 = neurs[1][n_key]
+        diffs[n_key] = cent_func(spks2[:, x_ind]) - cent_func(spks1[:, x_ind]) 
+    return diffs
+
+def plot_neuron_diffs(d1, d2, boots=1000, ax=None, color=None, ax_buff=.25,
+                      cent_func=np.mean, pt_alpha=.1, plot_indiv=False):
+    if ax is None:
+        f, ax = plt.subplots(1,1)
+    d1_keys = set(d1.keys())
+    d2_keys = set(d2.keys())
+    if plot_indiv:
+        for k in d1_keys.intersection(d2_keys):
+            ax.plot([0, 1], [d1[k], d2[k]], color=color, alpha=pt_alpha)
+            ax.plot([0], [d1[k]], 'o', color=color, alpha=pt_alpha)
+            ax.plot([1], [d2[k]], 'o', color=color, alpha=pt_alpha)
+    d1_arr = np.array(list(d1.values()))
+    d1_boots = u.bootstrap_list(d1_arr, cent_func, n=boots)
+    gpl.plot_trace_werr(np.array([0]), np.expand_dims(d1_boots, 1), ax=ax,
+                        color=color, fill=False, error_func=gpl.conf95_interval)
+    d2_arr = np.array(list(d2.values()))
+    d2_boots = u.bootstrap_list(d2_arr, cent_func, n=boots)
+    gpl.plot_trace_werr(np.array([1]), np.expand_dims(d2_boots, 1), ax=ax,
+                        color=color, fill=False, error_func=gpl.conf95_interval)
+    xl = ax.get_xlim()
+    ax.set_xlim(xl[0] - ax_buff, xl[1] + ax_buff)
+    gpl.add_hlines(0, ax)
+
+def compile_saccade_velocities(d, dfuncs, latt_groups, s_beg='saccade_begs',
+                               s_end='saccade_ends', ep='eyepos',
+                               fo='fixation_off', dist_thr=2):
+    assert len(dfuncs) == len(latt_groups)
+    ts = np.unique(latt_groups)
+    storage = tuple([] for i in ts)
+    for i, ind in enumerate(latt_groups):
+        d_i = d[dfuncs[i](d)]
+        for t in d_i:
+            b = t[s_beg][0] + t[fo]
+            e = t[s_end][0] + t[fo]
+            distance = np.sqrt(np.sum((t[ep][b] - t[ep][e])**2))
+            if distance > dist_thr:
+                vel = 1000*distance/(e - b)
+                storage[ind].append(vel)
+    return storage
+
+def get_sacc_vel(t, s_beg='saccade_begs', s_end='saccade_ends',
+                 ep='eyepos', fo='fixation_off', dist_thr=2):
+    b = t[s_beg][0] + t[fo] 
+    e = t[s_end][0] + t[fo]
+    distance = np.sqrt(np.sum((t[ep][b] - t[ep][e])**2))
+    if distance > dist_thr:
+        vel = 1000*distance/(e - b)
+    else:
+        vel = np.nan
+    return vel
+
+def plot_single_unit_scatter(ns, bhv, xs, x_pt, neur_key, labels=None, ax=None,
+                             colors=None, alphas=None, linestyles=None):
+    x_ind = np.argmin(np.abs(xs - x_pt))
+    if ax is None:
+        ax = f.add_subplot(1,1,1)
+    if alphas is None:
+        alphas = (1,)*len(ns)
+    if linestyles is None:
+        linestyles = (None,)*len(ns)
+    if colors is None:
+        colors = (None,)*len(ns)
+    for i, n in enumerate(ns):
+        neuron_n = n[neur_key][:, x_ind]
+        bhv_n = bhv[i][neur_key]
+        ax.plot(bhv_n, neuron_n, 'o', color=colors[i])
+
+def compute_velocity_firing_correlation(neurs, xs, bhvs, x_pt):
+    assert len(bhvs) == len(neurs)
+    x_ind = np.argmin(np.abs(xs - x_pt))
+    storage = []
+    for i, neur in enumerate(neurs):
+        bhv = bhvs[i]
+        storage.append({})
+        for k, spks in neur.items():
+            behav = np.array(bhv[k], dtype=float)
+            mask = np.logical_not(np.isnan(behav))
+            behav = behav[mask]
+            spks = spks[mask, x_ind]
+            cc = np.corrcoef(spks, behav)
+            storage[i][k] = cc[1, 0]
+    return storage
+
+def compile_fixation_latencies(d, dfuncs, latt_groups, fix_on='fixation_on',
+                               fix_acq='fixation_acquired', max_latt=1000):
+    assert len(dfuncs) == len(latt_groups)
+    ts = np.unique(latt_groups)
+    storage = tuple([] for i in ts)
+    for i, ind in enumerate(latt_groups):
+        d_i = d[dfuncs[i](d)]
+        fix_latts = d_i[fix_acq] - d_i[fix_on]
+        fix_latts = fix_latts[fix_latts < max_latt]
+        storage[ind].append(fix_latts)
+    return storage
+
 def plot_single_unit_eg(ns, xs, neur_key, labels, colors=None, linestyles=None,
                         ax=None, title=False, legend=True, alphas=None,
                         error_func=gpl.sem):
@@ -566,25 +718,31 @@ def plot_single_unit_eg(ns, xs, neur_key, labels, colors=None, linestyles=None,
         ax.set_title(neur_key)
     return ax
 
-def plot_decoding_info(decs, pt, ax1, ax2):
+def plot_decoding_info(decs, pt, ax1, ax2, colors=None):
     for i, (m, res) in enumerate(decs.items()):
-        plot_svm_decoding(res[1], res[2], ax=ax1)
+        plot_svm_decoding(res[1], res[2], ax=ax1, colordict=colors)
         gpl.add_vlines(0, ax1)
         gpl.add_hlines(.5, ax1, linestyle='dashed')
         gpl.add_hlines(.5, ax2, linestyle='dashed')
         plot_svm_decoding_point(res[1], res[2], pt, ax=ax2,
-                                   legend=False)
+                                   legend=False, colordict=colors)
         gpl.clean_plot(ax2, 1)
     return ax1, ax2
 
-def plot_svm_session_scatter(decs_pop, pt, ax, low_lim=.4, unity_color=(.9, .9, .9)):
+def plot_svm_session_scatter(decs_pop, pt, ax, low_lim=.4, colordict=None,
+                             unity_color=(.9, .9, .9)):
     for i, (m, pops) in enumerate(decs_pop.items()):
+        if colordict is None:
+            color = None
+        else:
+            color = colordict[m]
         cond_keys = list(pops[1].keys())
         pop_keys = pops[1][cond_keys[0]][0].keys()
         xs = pops[2]
         for j, pop_num in enumerate(pop_keys):
             r1 = {ck:(pops[1][ck][0][pop_num],) for ck in cond_keys}
-            plot_svm_decoding_scatter(r1[0], r1[1], xs, pt, ax=ax)
+            plot_svm_decoding_scatter(r1[0], r1[1], xs, pt, ax=ax,
+                                      color=color)
     ax.plot([low_lim, 1], [low_lim, 1], linestyle='dashed', 
             color=unity_color)
     ax.set_xlim([low_lim, 1])
@@ -675,11 +833,170 @@ def generate_lowlevel_extract_func(folder, trls, reduce_func=np.mean,
     
     return extract_func
 
+def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
+                            binstep, min_trials, cond_labels,
+                            dfunc_pts, min_spks=5, resample=100,
+                            shuff_labels=False, with_replace=False,
+                            pop=False, causal_timing=True, min_population=1,
+                            use_avail_trials=False, use_max_trials=False,
+                            **kwargs):
+    mfs = (mf,)*len(dfunc_group)
+    if pop:
+        out = na.organize_spiking_data_pop(data, dfunc_group, mfs,
+                                           start, end, binsize,
+                                           binstep=binstep,
+                                           min_trials=min_trials,
+                                           min_spks=None, 
+                                           causal_timing=causal_timing,
+                                           **kwargs)
+    else:
+        out = na.organize_spiking_data(data, dfunc_group, mfs,
+                                       start, end, binsize, binstep=binstep,
+                                       min_trials=min_trials,
+                                       min_spks=min_spks, 
+                                       causal_timing=causal_timing,
+                                       **kwargs)
+    dat, xs = out
+    dfunc_maxes = np.max(dfunc_pts, axis=0) + 1
+    if use_avail_trials:
+        all_mins = {k:np.inf for k in dat[0].keys()}
+        all_maxes = {k:0 for k in dat[0].keys()}
+        for d in dat:
+            all_mins = {k:min(all_mins[k], len(d[k])) for k in d.keys()}
+            all_maxes = {k:max(all_maxes[k], len(d[k])) for k in d.keys()}
+        min_trials = np.min(list(all_mins.values()))
+        max_trials = np.max(list(all_maxes.values()))
+    orgs = {}
+    if pop:
+        for k in dat[0].keys():
+            org = np.zeros(dfunc_maxes, dtype=object)
+            for i, dp in enumerate(dfunc_pts):
+                org[dp] = dat[i][k]
+            orgs[k] = org
+    else:
+        org = np.zeros(dfunc_maxes, dtype=object)
+        for i, dp in enumerate(dfunc_pts):
+            org[dp] = dat[i]
+        orgs['all'] = org
+    dpca_fits = {}
+    for k, org in orgs.items():
+        fits = []
+        print('{} neurons'.format(len(org[0, 0])))
+        for i in range(resample):
+            if use_max_trials:
+                trls = max_trials
+                fill_nan = True
+            else:
+                trls = min_trials
+                fill_nan = False
+            arr_form_i = na.array_format(org, trls, fill_nan=fill_nan,
+                                         with_replace=with_replace)
+            arr_form_i = np.moveaxis(arr_form_i, 2, -1)
+            print('{} / {}'.format(i+1, resample))
+            with u.HiddenPrints():
+                d = dPCA.dPCA(cond_labels, regularizer='auto')
+                arr_form_mean = np.nanmean(arr_form_i, axis=0)
+                d.protect = ['t']
+                d_fit = d.fit_transform(arr_form_mean, trialX=arr_form_i)
+                out = d.significance_analysis(arr_form_mean, arr_form_i,
+                                              axis=True, full=True)
+                s_mask, scores, shuff_scores = out
+                ev = d.explained_variance_ratio_
+            fits.append((d_fit, s_mask, scores, shuff_scores, ev))
+        dpca_fits[k] = fits
+    if not pop:
+        dpca_fits = dpca_fits['all']
+    return orgs, dpca_fits, xs
+
+def plot_dpca_kernels(dpca, xs, axs_keys, dim=0, arr_labels=None,
+                      signif_level=.01, color_dict=None, style_dict=None):
+    kerns, _, scores, shuff_scores, ev = dpca
+    for (k, ax) in axs_keys:
+        if k in shuff_scores.keys():
+            num_shuffs = len(shuff_scores[k])
+            score = np.expand_dims(scores[k][dim], 0)
+            shuff_score = np.array(list(shuff_scores[k][i][dim]
+                                        for i in range(num_shuffs)))
+            pval = 1 - np.sum(score > shuff_score, axis=0)/num_shuffs
+        else:
+            pval = np.ones_like(xs)
+        kern = kerns[k][dim]
+        sig = pval < signif_level
+        ax_shape = kern.shape[:-1]
+        ind_combs = itertools.product(*(range(x) for x in ax_shape))
+        
+        for ic in ind_combs:
+            k1 = kern[ic]
+            if color_dict is not None:
+                color = color_dict[k]
+            else:
+                color = None
+            if style_dict is not None:
+                style = style_dict[k][ic]
+            else:
+                style=None
+            l = gpl.plot_trace_werr(xs, k1, ax=ax, color=color, linestyle=style)
+            ax.plot(xs[sig], k1[sig], 'o', color=l[0].get_color())
+
+def _compute_latency_across_dim(scores, shuffs, xs, signif_level=.01,
+                                n_consecutive=5):
+        num_shuffs = len(shuffs)
+        latencies = np.zeros(scores.shape[0])
+        for dim in range(scores.shape[0]):
+            score = np.expand_dims(scores[dim], 0)
+            shuff_score = np.array(list(shuffs[i][dim]
+                                        for i in range(num_shuffs)))
+            pval = 1 - np.sum(score > shuff_score, axis=0)/num_shuffs
+            signif_mask = pval < signif_level
+            m = np.ones(n_consecutive)
+            out_conv = np.convolve(signif_mask, m, mode='valid')
+            out_mask = out_conv == n_consecutive
+            if np.any(out_mask):
+                first_ind = np.argmax(out_mask)
+                latencies[dim] = xs[first_ind]
+            else:
+                latencies[dim] = np.nan
+        if np.all(np.isnan(latencies)):
+            min_latency = np.nan
+        else:
+            min_latency = np.nanmin(latencies)
+        return min_latency            
+            
+def compute_dpca_latencies(dpcas, xs, key, signif_level=.01,
+                           n_consecutive=5):
+    latencies = np.zeros(len(dpcas))
+    for i, dpca in enumerate(dpcas):
+        kerns, _, scores, shuff_scores, ev = dpca
+        latencies[i] = _compute_latency_across_dim(scores[key],
+                                                   shuff_scores[key], xs,
+                                                   signif_level=signif_level,
+                                                   n_consecutive=n_consecutive)        
+    return latencies
+
+def compute_dpca_ev(dpcas):
+    evs = np.zeros(len(dpcas))
+    for i, dpca in enumerate(dpcas):
+        ev = dpca[-1]
+        for v in ev.values():
+            evs[i] += np.sum(v)
+    return evs
+
+def plot_dpca_kernels_resample(dpcas, xs, axs_keys, dim=0, arr_labels=None):
+    for (k, ax) in axs_keys:
+        kerns = [d[0][k][dim] for d in dpcas]
+        full_arr = np.stack(kerns, axis=0)
+        ax_shape = full_arr.shape[1:-1]
+        ind_combs = itertools.product(*(range(x) for x in ax_shape))
+        full_arr = np.swapaxes(full_arr, 0, len(ax_shape))
+        for ic in ind_combs:
+            gpl.plot_trace_werr(xs, full_arr[ic], ax=ax,
+                                error_func=gpl.conf95_interval)
+
 def organize_salience_decoding(data, dfunc_group, mf, start, end, binsize,
                                binstep, min_trials, bhv_extract_func,
                                cond_labels=None,
                                dfunc_pairs=None, min_spks=5, resample=100,
-                               shuff_labels=False, kernel='linear',
+                               shuff_labels=False, kernel='rbf',
                                model=svm.SVR, with_replace=False, penalty=1,
                                leave_out=4, collapse_time=False, zscore=True,
                                pop=False, causal_timing=True, equal_fold=False,
@@ -824,11 +1141,8 @@ def organize_svm_pairs(data, dfunc_group, mf, start, end, binsize, binstep,
                                         min_population=min_population)
             dec[label1] = out
             
-            d2_label, d1_label = cond_labels[i]
-            label2 = '{} -> {}'.format(d1_label, d2_label)
-            test_c1, train_c1 = c1
-            test_c2, train_c2 = c2
-            out = na.svm_cross_decoding(train_c1, test_c1, train_c2, test_c2,
+            label2 = '{} -> {}'.format(d2_label, d1_label)
+            out = na.svm_cross_decoding(test_c1, train_c1, test_c2, train_c2,
                                         require_trials=min_trials,
                                         resample=resample, leave_out=leave_out,
                                         shuff_labels=shuff_labels, 
@@ -936,7 +1250,7 @@ def plot_svm_trajectory(cond_trajs, ax, alpha=.2, central_tend=np.nanmean,
     return ax
         
 def plot_svm_decoding(results_dict, xs, figsize=None, colordict=None, ax=None,
-                      color=None, legend=True, shuffled_results=None,
+                      legend=True, shuffled_results=None,
                       legend_text=None):
     if ax is None:
         fig = plt.figure(figsize=figsize)
@@ -944,6 +1258,8 @@ def plot_svm_decoding(results_dict, xs, figsize=None, colordict=None, ax=None,
     for k, data in results_dict.items():
         if colordict is not None:
             color = colordict[k]
+        else:
+            color = None
         if legend and legend_text is None:
             label = str(k)
         elif legend and legend_text is not None:
@@ -958,7 +1274,8 @@ def plot_svm_decoding(results_dict, xs, figsize=None, colordict=None, ax=None,
                             error_func=gpl.conf95_interval)
     return ax
 
-def plot_svm_decoding_angs(decs, pt, ax):
+def plot_svm_decoding_angs(decs, pt, ax, rand_pt=0, cross_color=None,
+                           wi_color=None, rand_color=None):
     for m, (org, dec, xs) in decs.items():
         assert len(dec) == 2
         k1, k2 = list(dec.keys())
@@ -970,7 +1287,17 @@ def plot_svm_decoding_angs(decs, pt, ax):
         min_trls = min(ms1.shape[0], ms2.shape[0])
         angs = [u.vector_angle(ms1[i, :, x_pt], ms2[i, :, x_pt])
                 for i in range(min_trls)]
-        ax.hist(angs, histtype='step', density=True)
+        wi_ind_pairs = list(itertools.product(range(min_trls), repeat=2))
+        angs_wi1 = list(u.vector_angle(ms1[i, :, x_pt], ms1[j, :, x_pt])
+                        for (i, j) in wi_ind_pairs)
+        angs_wi2 = list(u.vector_angle(ms2[i, :, x_pt], ms2[j, :, x_pt])
+                        for (i, j) in wi_ind_pairs)
+        angs_wi = angs_wi1 + angs_wi2
+        angs_rand =  [u.vector_angle(ms1[i, :, rand_pt], ms2[i, :, rand_pt])
+                      for i in range(min_trls)]
+        ax.hist(angs, histtype='step', density=True, color=cross_color)
+        ax.hist(angs_wi, histtype='step', density=True, color=wi_color)
+        ax.hist(angs_rand, histtype='step', density=True, color=rand_color)
         gpl.clean_plot(ax, 0)
         
 def plot_svm_decoding_point(results_dict, xs, pt, figsize=None, colordict=None,
@@ -1009,7 +1336,7 @@ def plot_svm_decoding_point(results_dict, xs, pt, figsize=None, colordict=None,
         ax.set_xticklabels(labels, rotation=90)
     return ax
 
-def plot_svm_decoding_scatter(r1, r2, xs, pt, figsize=None, colordict=None,
+def plot_svm_decoding_scatter(r1, r2, xs, pt, figsize=None, 
                               ax=None, color=None, legend=True,
                               shuffled_results=None, legend_text=None,
                               central_tend=np.nanmean):
@@ -1021,7 +1348,8 @@ def plot_svm_decoding_scatter(r1, r2, xs, pt, figsize=None, colordict=None,
     x_ind = np.argmin(np.abs(xs - pt))
     l = gpl.plot_trace_werr(tcs1[:, x_ind:x_ind+1], tcs2[:, x_ind:x_ind+1],
                             ax=ax, fill=False, central_tendency=central_tend,
-                            error_func=gpl.conf95_interval, points=True)
+                            error_func=gpl.conf95_interval, points=True,
+                            color=color)
                         
 def produce_proportions(ns, n_labels, ind_labels, t_filt=None, sig_thr=.01):
     for i, n in enumerate(ns):
