@@ -516,7 +516,9 @@ def find_saccades(eyepos, skips=1, stdthr=None, filtwin=40, thr=.1,
     abseyed = np.abs(eyederiv)
     if thr is None:
         thr = stdthr*np.std(abseyed[abseyed < vthr])
-    saccs = np.logical_or(abseyed[:, 0] > thr, abseyed[:, 1] > thr)
+    eyevel = np.sqrt(np.sum(eyederiv**2, axis=1))
+    # saccs = np.logical_or(abseyed[:, 0] > thr, abseyed[:, 1] > thr)
+    saccs = eyevel > thr
     saccs = saccs.astype(np.int)
     saccs_d = np.diff(saccs)
     sac_bs = np.where(saccs_d == 1)[0]*skips
@@ -557,9 +559,10 @@ def get_fixation_lengths(sac_bs, sac_es):
 
 def filter_short_fixes(sac_bs, sac_es, thr=10):
     lens = get_fixation_lengths(sac_bs, sac_es)
-    lens = np.concatenate((lens, (thr+1,)), axis=0)
-    f_bs = sac_bs[lens > thr]
-    f_es = sac_es[lens > thr]
+    lens_beg = np.concatenate(((thr+1,), lens), axis=0)
+    lens_end = np.concatenate((lens, (thr+1,)), axis=0)
+    f_bs = sac_bs[lens_beg > thr]
+    f_es = sac_es[lens_end > thr]
     return f_bs, f_es
 
 def full_box_locs(locs, x, y, xw, yw):
