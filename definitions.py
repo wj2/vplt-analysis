@@ -94,12 +94,24 @@ fr_sdms2_r = 18
 
 rufus_plt_conds_norw = (fn_plt_r, ff_plt_r, nn_plt_r, nf_plt_r, rr_plt_r,
                         rn_plt_r, nr_plt_r, rf_plt_r, fr_plt_r,)
-                        # hl_plt_r, ll_plt_r, hh_plt_r, lh_plt_r)
+rufus_lum_conds_norw = (hl_plt_r, ll_plt_r, hh_plt_r, lh_plt_r)
+
 rufus_sdms_conds_norw = (fn_sdms1_r, fn_sdms2_r, ff_sdms1_r, ff_sdms2_r,
                          nn_sdms1_r, nn_sdms2_r, nf_sdms1_r, nf_sdms2_r,
                          rr_sdms1_r, rr_sdms2_r, rn_sdms1_r, rn_sdms2_r,
                          nr_sdms1_r, nr_sdms2_r, rf_sdms1_r, rf_sdms2_r,
                          fr_sdms1_r, fr_sdms2_r)
+
+cgroups = {}
+cgroups['Rufus'] = {'left':(nf_sdms1_r, fn_sdms1_r,
+                                  ff_sdms1_r, nn_sdms1_r),
+                    'right':(nf_sdms2_r, fn_sdms2_r,
+                                   ff_sdms2_r, nn_sdms2_r),
+                    'familiar':(fn_sdms1_r, nf_sdms2_r,
+                                      ff_sdms1_r, ff_sdms2_r),
+                    'novel':(nf_sdms1_r, fn_sdms2_r,
+                                   nn_sdms1_r, nn_sdms2_r)}
+
 
 # Constraint functions
 ## behavior model
@@ -575,6 +587,7 @@ reading_params['Bootsy'] = {'plt_conds': bootsy_plt_conds_norw,
                             'eye_params':eye_params['Bootsy']}
 reading_params['Rufus'] = {'plt_conds': rufus_plt_conds_norw,
                            'sdms_conds': rufus_sdms_conds_norw,
+                           'lum_conds':rufus_lum_conds_norw,
                            'noerr': False, 'ephys': True,
                            'default_img1_xy': d1_xy_rufus, 
                            'default_img2_xy':d2_xy_rufus,
