@@ -4,6 +4,7 @@ import general.plotting_styles as gps
 import general.plotting as gpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
+import matplotlib.lines as lines
 import numpy as np
 import scipy.stats as sts
 import os
@@ -36,11 +37,11 @@ def figure1(data=None, gen_panels=None, exper_data=None,
     if exper_data is None:
         exper_data = load_all_data(monkey_paths)
     if gen_panels is None:
-        gen_panels = ('d', 'e', 'f', 'g', 'h')
+        gen_panels = ('d', 'e', 'f', 'g', 'h', 'other_quant')
     if data is None:
         data = {}
 
-    fsize = (4.5, 4)
+    fsize = (5, 4)
     f = plt.figure(figsize=fsize)
     gs = f.add_gridspec(100, 100)
 
@@ -48,12 +49,13 @@ def figure1(data=None, gen_panels=None, exper_data=None,
     brain_schem_grid = gs[:35, :25]
     plt_schem_grid = gs[:35, 25:70]
     
-    plt_sacc_grid = gs[:25, 85:]
-    sdms_behav_grid = gs[38:60, 85:]
+    plt_sacc_grid = gs[:25, 90:]
+    sdms_behav_grid = gs[38:60, 90:]
+    comb_behav_grid = gs[70:, 90:]
 
-    sacc_latency_grid = gs[70:, :26]
-    sacc_velocity_grid = gs[70:, 36:63]
-    fix_latency_grid = gs[70:, 72:]
+    sacc_latency_grid = gs[70:, :21]
+    sacc_velocity_grid = gs[70:, 31:50]
+    fix_latency_grid = gs[70:, 60:79]
 
     sdms_schem_ax = f.add_subplot(sdms_schem_grid)
     plt_schem_ax = f.add_subplot(plt_schem_grid)
@@ -79,36 +81,94 @@ def figure1(data=None, gen_panels=None, exper_data=None,
     if 'd' in gen_panels:
         sdms_bhv = data['d']
         for i, (m, perf_dict) in enumerate(sdms_bhv.items()):
-            offset = (i - len(sdms_bhv)/2)/10
-            pl.plot_sdms_performance(perf_dict, offset, sdms_behav_ax,
+            p = perf_dict['all']
+            gpl.print_mean_conf95(p, m, 'sDMST performance', n_boots=n_boots,
+                                  preboot=True)
+            pd = {k:v for k, v in perf_dict.items() if k != 'all'}
+            offset = (i - len(sdms_bhv)/2)/5
+            pl.plot_sdms_performance(pd, offset, sdms_behav_ax,
                                      color=monkey_colors[m])
         gpl.add_hlines(.5, sdms_behav_ax)
         gpl.clean_plot_bottom(sdms_behav_ax, keeplabels=True)
 
     if 'e' not in data.keys() and 'e' in 'gen_panels':
         fsps = {}
+        fs_total = {}
+        bias_dicts = {}
         for m, mdata in exper_data.items():
+            sdms_func = pl.compute_simple_sdms_performance
+            sdms_args = [mdata[0], d.cgroups[m]]
+            sd, sdms_inds = na.apply_function_on_runs(sdms_func, sdms_args,
+                                                      ret_index=True,
+                                                      n_boots=n_boots)
+            sdms_dict = dict(zip(sdms_inds, sd))
+
             args = [mdata[0], d.reading_params[m]]
-            ps = na.apply_function_on_runs(pl.get_first_saccade_prob, args)
+            fs_all = pl.get_first_saccade_prob_bs(mdata[0],
+                                                  d.reading_params[m],
+                                                  n_boots=n_boots)
+            fs_total[m] = fs_all
+            
+            args = [mdata[0], d.reading_params[m]]
+            out = na.apply_function_on_runs(pl.get_first_saccade_prob, args,
+                                            ret_index=True)
+            ps, run_inds = out
             ps = np.array(ps)
+            bias_dict = dict(zip(run_inds, np.abs(ps - .5) + .5))
             ps = ps[np.logical_not(np.isnan(ps))]
             fsps[m] = ps
-        data['e'] = fsps
+            bias_dicts[m] = bias_dict, sdms_dict
+        data['e'] = fsps, fs_total, bias_dicts
 
+    if 'other_quant' in gen_panels and 'other_quant' not in data.keys():
+        fs_total = {}
+        for m, mdata in exper_data.items():
+            args = [mdata[0], d.reading_params[m]]
+            img_prob = pl.get_image_saccade_prob(mdata[0],
+                                                 d.reading_params[m])
+            fs_total[m] = img_prob
+        data['other_quant'] = fs_total
+
+    if 'other_quant' in gen_panels:
+        img_sacc_total = data['other_quant']
+        for m, img_sacc in img_sacc_total.items():
+            print('{} made {:.2f} first saccades to an image'.format(m, img_sacc))
+        
     plt_sacc_ax = f.add_subplot(plt_sacc_grid)
+    comb_behav_ax = f.add_subplot(comb_behav_grid)
     if 'e' in gen_panels:
-        fsps = data['e']
-        for m, ps in fsps.items():
-            plt_sacc_ax.hist(ps, histtype='step',
-                             color=monkey_colors[m])
-            gpl.add_vlines(np.nanmean(ps), plt_sacc_ax, color=monkey_colors[m])
-        plt_sacc_ax.set_xlabel('first saccade probability')
-        plt_sacc_ax.set_ylabel('sessions')
-        gpl.add_vlines(.5, plt_sacc_ax)
+        fsps, fs_total, bias_dicts = data['e']
+        for i, (m, ps) in enumerate(fsps.items()):
+            gpl.print_mean_conf95(fs_total[m], m, 'PLT FS bias', n_boots=n_boots,
+                                  preboot=True)
+
+            x_pos = np.array([i])
+            ps_arr = np.expand_dims(ps, axis=1)
+            p = plt_sacc_ax.violinplot(ps, positions=x_pos,
+                                       showextrema=False)
+            gpl.plot_trace_werr(x_pos, ps_arr, points=True,
+                                color=monkey_colors[m], ax=plt_sacc_ax,
+                                error_func=gpl.conf95_interval)
+            gpl.set_violin_color(p, monkey_colors[m])
+            b_p, b_s = bias_dicts[m]
+            b_zip = np.array(list((p, b_s[k]) for k, p in b_p.items()))
+            comb_behav_ax.plot(b_zip[:, 0], b_zip[:, 1], 'o',
+                               color=monkey_colors[m])
+        plt_sacc_ax.set_ylabel('P(first saccade to novel)')
+        comb_behav_ax.set_xlabel('PLT bias')
+        comb_behav_ax.set_ylabel('sDMST accuracy')
+        comb_behav_ax.set_xticks([.5, .7])
+        comb_behav_ax.set_yticks([.5, .8])
+        plt_sacc_ax.set_xticks(range(len(fsps)))
+        plt_sacc_ax.set_xticklabels(list(fsps.keys()), rotation=90)
+        gpl.clean_plot_bottom(plt_sacc_ax, keeplabels=True)
+        gpl.add_hlines(.5, plt_sacc_ax)
         gpl.clean_plot(plt_sacc_ax, 0)
+        gpl.clean_plot(comb_behav_ax, 0)
 
     dfunc_group = {}
     dfunc_group['Rufus'] = (d.saccin_plt, d.saccin_sdms)
+    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccin_sdms_n)
 
     latt_group = (0, 1)
     if 'f' not in data.keys() and 'f' in gen_panels:
@@ -120,16 +180,35 @@ def figure1(data=None, gen_panels=None, exper_data=None,
             
     latt_ax = f.add_subplot(sacc_latency_grid)
     if 'f' in gen_panels:
+        p_lat_all = np.array([])
+        s_lat_all = np.array([])
         for m, dat in exper_data.items():
             p_lat, s_lat = data['f'][m]
-            latt_ax.hist(p_lat, label='PLT', density=True, histtype='step',
-                         color=plt_sc)
-            latt_ax.hist(s_lat, label='sDMST', density=True, histtype='step',
-                         color=sdms_sc)
-            gpl.add_vlines(np.mean(p_lat), latt_ax, color=plt_sc)
-            gpl.add_vlines(np.mean(s_lat), latt_ax, color=sdms_sc)
-            gpl.clean_plot(latt_ax, 0)
+            gpl.print_mean_conf95(p_lat[0], m, 'saccade latency, PLT',
+                                  n_boots=n_boots)
+            gpl.print_mean_conf95(s_lat[0], m, 'saccade latency, sDMST',
+                                  n_boots=n_boots)
+            gpl.print_diff_conf95(p_lat[0], s_lat[0], m, 'latency diff',
+                                  n_boots=n_boots)
+            p_lat_all = np.concatenate((p_lat_all, p_lat[0]))
+            s_lat_all = np.concatenate((s_lat_all, s_lat[0]))
+        gpl.print_mean_conf95(p_lat_all, 'combined', 'saccade latency, PLT',
+                              n_boots=n_boots)
+        gpl.print_mean_conf95(s_lat_all, 'combined', 'saccade latency, sDMST',
+                              n_boots=n_boots)
+        gpl.print_diff_conf95(p_lat_all, s_lat_all, 'combined', 'latency diff',
+                              n_boots=n_boots)
+        latt_ax.hist(p_lat_all, label='PLT', density=True, histtype='step',
+                     color=plt_sc)
+        latt_ax.hist(s_lat_all, label='sDMST', density=True, histtype='step',
+                     color=sdms_sc)
+        gpl.clean_plot(latt_ax, 0)
         latt_ax.set_xlabel('first saccade\nlatency (ms)')
+        plt_legend = lines.Line2D([], [], color=plt_sc,
+                             label='PLT')
+        sdms_legend = lines.Line2D([], [], color=sdms_sc,
+                              label='sDMST')
+        latt_ax.legend(handles=(plt_legend, sdms_legend), frameon=False)
         gpl.make_yaxis_scale_bar(latt_ax, anchor=0, magnitude=.01, double=False,
                                  label='density', text_buff=.4)
 
@@ -143,15 +222,34 @@ def figure1(data=None, gen_panels=None, exper_data=None,
         
     vel_ax = f.add_subplot(sacc_velocity_grid)
     if 'g' in gen_panels:
+        p_vel_all = np.array([])
+        s_vel_all = np.array([])
         for m, dat in exper_data.items():
             p_vel, s_vel = data['g'][m]
-            vel_ax.hist(p_vel, label='PLT', density=True, histtype='step',
-                         color=plt_sc)
-            vel_ax.hist(s_vel, label='sDMST', density=True, histtype='step',
-                         color=sdms_sc)
-            gpl.add_vlines(np.mean(p_vel), vel_ax, color=plt_sc)
-            gpl.add_vlines(np.mean(s_vel), vel_ax, color=sdms_sc)
-            gpl.clean_plot(vel_ax, 0)
+            p_vel = np.array(p_vel)
+            s_vel = np.array(s_vel)
+            gpl.print_mean_conf95(p_vel, m, 'saccade velocity, PLT',
+                              n_boots=n_boots)
+            gpl.print_mean_conf95(s_vel, m, 'saccade velocity, sDMST',
+                              n_boots=n_boots)
+            gpl.print_diff_conf95(p_vel, s_vel, m, 'velocity diff',
+                                  n_boots=n_boots)
+
+            p_vel_all = np.concatenate((p_vel_all, p_vel))
+            s_vel_all = np.concatenate((s_vel_all, s_vel))
+            
+        gpl.print_mean_conf95(p_vel_all, 'combined', 'saccade velocity, PLT',
+                              n_boots=n_boots)
+        gpl.print_mean_conf95(s_vel_all, 'combined', 'saccade velocity, sDMST',
+                              n_boots=n_boots)
+        gpl.print_diff_conf95(p_vel_all, s_vel_all, 'combined', 'velocity diff',
+                              n_boots=n_boots)
+
+        vel_ax.hist(p_vel_all, label='PLT', density=True, histtype='step',
+                    color=plt_sc)
+        vel_ax.hist(s_vel_all, label='sDMST', density=True, histtype='step',
+                    color=sdms_sc)
+        gpl.clean_plot(vel_ax, 0)
         vel_ax.set_xlabel('saccade velocity\n(deg/s)')
         gpl.make_yaxis_scale_bar(vel_ax, anchor=0, magnitude=.002, double=False)
 
@@ -166,18 +264,32 @@ def figure1(data=None, gen_panels=None, exper_data=None,
 
     fix_ax = f.add_subplot(fix_latency_grid)
     if 'h' in gen_panels:
+        p_fix_all = np.array([])
+        s_fix_all = np.array([])
         for m, dat in exper_data.items():
             p_fix, s_fix, h_bins = data['h'][m]
-            fix_ax.hist(p_fix, bins=h_bins, label='PLT', density=True, histtype='step',
-                         color=plt_sc)
-            fix_ax.hist(s_fix, bins=h_bins, label='sDMST', density=True, histtype='step',
-                         color=sdms_sc)
-            gpl.add_vlines(np.median(p_fix), fix_ax, color=plt_sc)
-            gpl.add_vlines(np.median(s_fix), fix_ax, color=sdms_sc)
-            gpl.clean_plot(fix_ax, 0)
+            gpl.print_mean_conf95(p_fix[0], m, 'fix latency, PLT',
+                                  n_boots=n_boots, func=np.mean)
+            gpl.print_mean_conf95(s_fix[0], m, 'fix latency, sDMST',
+                              n_boots=n_boots, func=np.mean)
+            gpl.print_diff_conf95(p_fix[0], s_fix[0], m, 'fix diff',
+                                  n_boots=n_boots, func=np.mean)
+            p_fix_all = np.concatenate((p_fix_all, p_fix[0]))
+            s_fix_all = np.concatenate((s_fix_all, s_fix[0]))
+        gpl.print_mean_conf95(p_fix_all, 'combined', 'fix latency, PLT',
+                              n_boots=n_boots, func=np.mean)
+        gpl.print_mean_conf95(s_fix_all, 'combined', 'fix latency, sDMST',
+                              n_boots=n_boots, func=np.mean)
+        gpl.print_diff_conf95(p_fix_all, s_fix_all, 'combined', 'fix diff',
+                              n_boots=n_boots, func=np.mean)
+        fix_ax.hist(p_fix_all, label='PLT', density=True,
+                    histtype='step', color=plt_sc)
+        fix_ax.hist(s_fix_all,  label='sDMST', density=True,
+                    histtype='step', color=sdms_sc)
+        gpl.clean_plot(fix_ax, 0)
         fix_ax.set_xlabel('trial initiation\nlatency (ms)')
-        fix_ax.set_xscale('log')
-        gpl.make_yaxis_scale_bar(fix_ax, anchor=0, magnitude=.05, double=False)
+        fix_ax.set_xlim([0, 500])
+        gpl.make_yaxis_scale_bar(fix_ax, anchor=0, magnitude=.005, double=False)
 
     bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig1-py.svg')
@@ -185,7 +297,8 @@ def figure1(data=None, gen_panels=None, exper_data=None,
     return data    
 
 def figure2(data=None, gen_panels=None, exper_data=None,
-            monkey_paths=pl.monkey_paths, config_file=config_path):
+            monkey_paths=pl.monkey_paths, config_file=config_path,
+            rand_eg=False):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -201,16 +314,14 @@ def figure2(data=None, gen_panels=None, exper_data=None,
     f = plt.figure(figsize=fsize)
     gs = f.add_gridspec(100, 100)
 
-    eg1_grid = gs[:30, :60]
-    eg2_grid = gs[35:65, :60]
+    eg1_grid = gs[:27, :60]
+    eg2_grid = gs[32:60, :60]
 
     presacc_scatter_grid = gs[70:, :35]
     sacc_scatter_grid = gs[70:, 40:75]
-    diff_scatter_grid = gs[85:, 80:]
+    diff_scatter_grid = gs[70:, 90:]
 
-    vel1_grid = gs[:25, 70:]
-    vel2_grid = gs[30:55, 70:]
-    vel_scatter_grid = gs[60:85, 70:]
+    vel_scatter_grid = gs[10:50, 72:]
 
     # colors
     sdms_sc = params.getcolor('sdms_sacc_color')
@@ -235,9 +346,12 @@ def figure2(data=None, gen_panels=None, exper_data=None,
 
     # fig 2 trial selection params
     dfunc_group = {}
-    dfunc_group['Rufus'] = (d.saccin_plt, d.saccin_sdms)
+    dfunc_group['Rufus'] = (d.saccin_plt, d.saccout_plt,
+                            d.saccin_sdms, d.saccout_sdms)
+    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccout_plt_n,
+                              d.saccin_sdms_n, d.saccout_sdms_n)
 
-    if 'abc' not in data.keys():
+    if 'a' not in data.keys():
         neurs = {}
         for m, mdata in exper_data.items():
             mfs = (mf,)*len(dfunc_group[m])
@@ -247,46 +361,82 @@ def figure2(data=None, gen_panels=None, exper_data=None,
                                            causal_timing=causal_timing,
                                            bhv_extract_func=pl.get_sacc_vel)
             neurs[m] = out
-        data['abc'] = neurs
+        data['a'] = neurs
     else:
-        neurs = data['abc']    
+        neurs = data['a']    
         
     scatter_pt = params.getint('check_pt')
-    eg1_key = {'Rufus':(20, 'SPK07a')}
-    eg2_key = {'Rufus':(23, 'CLUSTER9')}
+    eg1_info = ('Rufus', (15, 'CLUSTER9'))
+    key_r = list(neurs['Rufus'][0][0])
+    key_n = list(neurs['Neville'][0][0])
+    
+    if rand_eg:
+        eg1_ind = int(np.random.choice(len(key_r), 1))
+        eg2_ind = int(np.random.choice(len(key_n), 1))
+    else:
+        eg1_ind = 1
+        eg2_ind = 221        
+
+    eg1_info = ('Rufus', key_r[eg1_ind])
+    eg2_info = ('Neville', key_n[eg2_ind])
+
     eg1_ax = f.add_subplot(eg1_grid)
     eg2_ax = f.add_subplot(eg2_grid, sharex=eg1_ax, sharey=eg1_ax)
-    vel1_ax = f.add_subplot(vel1_grid)
-    vel2_ax = f.add_subplot(vel2_grid, sharex=vel1_ax, sharey=vel1_ax)
-    if 'b' in gen_panels:
-        for m, (neur, xs, bhv) in neurs.items():
-            pl.plot_single_unit_eg(neur, xs, eg1_key[m], labels=('PLT', 'sDMST'),
-                                   ax=eg1_ax, colors=(plt_sc, sdms_sc))
-            pl.plot_single_unit_eg(neur, xs, eg2_key[m], labels=('', ''),
-                                   ax=eg2_ax, colors=(plt_sc, sdms_sc))
-            pl.plot_single_unit_scatter(neur, bhv, xs, scatter_pt, eg1_key[m],
-                                        labels=('', ''), ax=vel1_ax,
-                                        colors=(plt_sc, sdms_sc))
-            pl.plot_single_unit_scatter(neur, bhv, xs, scatter_pt, eg2_key[m],
-                                        labels=('', ''), ax=vel2_ax,
-                                        colors=(plt_sc, sdms_sc))
+    if 'a' in gen_panels:
+        m1, eg1_key = eg1_info
+        m2, eg2_key = eg2_info
+        ls = ('solid', 'dashed', 'solid', 'dashed')
+        labels_1 = ('PLT', '', 'sDMST', '')
+        labels_2 = ('', '', '', '')
+        colors = (plt_sc, plt_sc, sdms_sc, sdms_sc)
+        pl.plot_single_unit_eg(neurs[m1][0], neurs[m1][1], eg1_key,
+                               labels=labels_1, linestyles=ls,
+                               ax=eg1_ax, colors=colors)
+        pl.plot_single_unit_eg(neurs[m2][0], neurs[m2][1], eg2_key,
+                               labels=labels_2, ax=eg2_ax, linestyles=ls,
+                               colors=colors)
         gpl.make_xaxis_scale_bar(eg2_ax, magnitude=50, label='time (ms)')
-        gpl.make_yaxis_scale_bar(eg2_ax, magnitude=10, anchor=5, double=False,
+        gpl.make_yaxis_scale_bar(eg2_ax, magnitude=35, anchor=5, double=False,
                                  label='spikes/s')
-        gpl.make_yaxis_scale_bar(eg1_ax, magnitude=10, anchor=5, double=False,
+        gpl.make_yaxis_scale_bar(eg1_ax, magnitude=35, anchor=5, double=False,
                                  label='spikes/s')
         gpl.clean_plot_bottom(eg1_ax)
 
+    dfunc_group = {}
+    dfunc_group['Rufus'] = (d.saccin_plt, d.saccin_sdms)
+    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccin_sdms_n)
+
+    if 'bc' not in data.keys():
+        neurs = {}
+        for m, mdata in exper_data.items():
+            mfs = (mf,)*len(dfunc_group[m])
+            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
+                                           end, binsize, binstep=binstep, 
+                                           min_trials=min_trials, zscore=zscore,
+                                           causal_timing=causal_timing,
+                                           bhv_extract_func=pl.get_sacc_vel)
+            neurs[m] = out
+        data['bc'] = neurs
+    else:
+        neurs = data['bc']    
+        
     vel_scatter_ax = f.add_subplot(vel_scatter_grid)
-    if 'c' in gen_panels:
-        neurs = data['abc']
+    if 'b' in gen_panels:
+        neurs = data['bc']
         for m, (neur, xs, bhv) in neurs.items():
             vcorr = pl.compute_velocity_firing_correlation(neur, xs, bhv,
                                                            scatter_pt)
             vcorr_pairs = np.array(list((v, vcorr[1][k])
                                         for k, v in vcorr[0].items()))
+            gpl.print_mean_conf95(vcorr_pairs[:, 0], m, 'sDMST vcorr')
+            gpl.print_mean_conf95(vcorr_pairs[:, 1], m, 'PLT vcorr')
             vel_scatter_ax.plot(vcorr_pairs[:, 0], vcorr_pairs[:, 1], 'o',
                                 color=monkey_colors[m])
+        gpl.clean_plot(vel_scatter_ax, 0)
+        gpl.make_yaxis_scale_bar(vel_scatter_ax, magnitude=.2, anchor=0,
+                                 label='PLT velocity\ncorrelation', text_buff=.25)
+        gpl.make_xaxis_scale_bar(vel_scatter_ax, magnitude=.2, anchor=0,
+                                 label='sDMST velocity\ncorrelation')
             
         
     boots = params.getint('boots')
@@ -295,10 +445,10 @@ def figure2(data=None, gen_panels=None, exper_data=None,
     scatter_ax = f.add_subplot(sacc_scatter_grid)
     if 'c' in gen_panels:
         for m, neur in neurs.items():
+            print('{}: {} neurons, task'.format(m, len(neur[0][0])))
             pl.plot_neuron_scatters(neur[:2], scatter_pt, lims=lims, boots=boots,
                                     ax=scatter_ax, color=monkey_colors[m])
         scatter_ax.set_xlabel('PLT activity (spikes/s)')
-        scatter_ax.set_ylabel('sDMST activity (spikes/s)')
 
     mf = d.fixation_acquired
     if 'd' not in data.keys() and 'd' in gen_panels:
@@ -313,12 +463,15 @@ def figure2(data=None, gen_panels=None, exper_data=None,
         data['d'] = neurs
     
     scatter_pt = 0
-    pre_scatter_ax = f.add_subplot(presacc_scatter_grid)
+    pre_scatter_ax = f.add_subplot(presacc_scatter_grid, sharex=scatter_ax,
+                                   sharey=scatter_ax)
     if 'd' in gen_panels:
         neurs = data['d']
         for m, neur in neurs.items():
+            print('{}: {} neurons, pre'.format(m, len(neur[0][1])))
             pl.plot_neuron_scatters(neur[:2], scatter_pt, lims=lims, boots=boots,
                                     ax=pre_scatter_ax, color=monkey_colors[m])
+        pre_scatter_ax.set_ylabel('sDMST activity\n(spikes/s)')
 
     mf1 = d.fixation_acquired
     mf2 = d.first_sacc_func
@@ -343,20 +496,272 @@ def figure2(data=None, gen_panels=None, exper_data=None,
     scatter_pt = 0
     diff_scatter_ax = f.add_subplot(diff_scatter_grid)
     if 'e' in gen_panels:
-        for m, neur in neurs.items():
+        for i, (m, neur) in enumerate(neurs.items()):
             diffs1, diffs2 = data['e'][m]
-            pl.plot_neuron_diffs(diffs1, diffs2, boots=boots, ax=diff_scatter_ax,
-                                 color=monkey_colors[m])
+            offset = (i - len(neurs)/2)/5
+            pre_diffs = np.array(list(diffs1.values()))
+            task_diffs = np.array(list(diffs2.values()))
+            n_greater_pre = np.sum(pre_diffs > 0)
+            n_greater_task = np.sum(task_diffs > 0)
+            s_temp = '{}: {} neurons fire more in sDMST, {}'
+            print(s_temp.format(m, n_greater_pre, 'pre'))
+            print(s_temp.format(m, n_greater_task, 'task'))
+            out = pl.plot_neuron_diffs(diffs1, diffs2, boots=boots,
+                                       ax=diff_scatter_ax,
+                                       color=monkey_colors[m], offset=offset)
+            d1_boots, d2_boots = out
+            gpl.print_mean_conf95(d1_boots, m, 'z-scored diff, pre',
+                                  preboot=True)
+            gpl.print_mean_conf95(d2_boots, m, 'z-scored diff, task',
+                                  preboot=True)
+            
         gpl.clean_plot_bottom(diff_scatter_ax, keeplabels=True)
-        gpl.make_yaxis_scale_bar(diff_scatter_ax, anchor=0, magnitude=.1,
-                                 double=False, label='sDMS - PLT')
         diff_scatter_ax.set_xticks([0, 1])
         diff_scatter_ax.set_xticklabels(['pre', 'img'], rotation=90)
+        y_lab = 'sDMST - PLT\n(z-scored)'
+        gpl.make_yaxis_scale_bar(diff_scatter_ax, anchor=0, magnitude=.1,
+                                 double=False, label=y_lab,
+                                 text_buff=.9)
         
     bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig2-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
+
+def figure2a(data=None, gen_panels=None, exper_data=None,
+             monkey_paths=pl.monkey_paths, config_file=config_path,
+             rand_eg=False):
+    setup()
+    cf = u.ConfigParserColor()
+    cf.read(config_file)
+    params = cf['figure2a']
+    if exper_data is None:
+        exper_data = load_all_data(monkey_paths)
+    if gen_panels is None:
+        gen_panels = ('a', 'b', 'cd', 'e')
+    if data is None:
+        data = {}
+
+    fsize = (5, 4.25)
+    f = plt.figure(figsize=fsize)
+    gs = f.add_gridspec(100, 100)
+
+    eg1_sacc_grid = gs[:23, :30]
+    eg2_sacc_grid = gs[27:48, :30]
+
+    eg1_prior_grid = gs[52:73, :30]
+    eg2_prior_grid = gs[77:, :30]
+
+    o1_m1 = gs[:35, 35:50]
+    o1_m2 = gs[35:70, 35:50]
+    o1_mb = gs[80:, 35:50]
+
+    o2_m1 = gs[:35, 50:80]
+    o2_m2 = gs[35:70, 50:80]
+    o2_mb = gs[80:, 50:80]
+    
+    o3_m1 = gs[:35, 80:]
+    o3_m2 = gs[35:70, 80:]
+    o3_mb = gs[80:, 80:]
+
+    glm_axs = {'Neville':(o1_m1, o2_m1, o3_m1),
+               'Rufus':(o1_m2, o2_m2, o3_m2)}
+    glm_mag_axs = (o1_mb, o2_mb, o3_mb)
+    
+    # colors
+    sdms_sc = params.getcolor('sdms_sacc_color')
+    plt_sc = params.getcolor('plt_sacc_color')
+    sdms_mc = params.getcolor('sdms_match_color')
+    plt_fc = params.getcolor('plt_fam_color')
+    comp_c = params.getcolor('comparison_color')
+    r_color = params.getcolor('rufus_color')
+    n_color = params.getcolor('neville_color')
+    monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+
+    # fig 2 timing params
+    start = params.getint('start')
+    end = params.getint('end')
+    binsize = params.getint('binsize')
+    binstep = params.getint('binstep')
+    
+    min_trials = params.getint('min_trials')
+    min_spks = params.getint('min_spks')
+    zscore = params.getboolean('zscore')
+    causal_timing = params.getboolean('causal_timing')
+
+    mf = d.first_sacc_func
+
+    # fig 2 trial selection params
+    dfunc_group = {}
+    dfunc_group['Rufus'] = (d.saccin_plt, d.saccout_plt,
+                            d.saccin_sdms, d.saccout_sdms)
+    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccout_plt_n,
+                              d.saccin_sdms_n, d.saccout_sdms_n)
+
+    if 'a' not in data.keys():
+        neurs = {}
+        for m, mdata in exper_data.items():
+            mfs = (mf,)*len(dfunc_group[m])
+            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
+                                           end, binsize, binstep=binstep, 
+                                           min_trials=min_trials, zscore=zscore,
+                                           causal_timing=causal_timing,
+                                           bhv_extract_func=pl.get_sacc_vel)
+            neurs[m] = out
+        data['a'] = neurs
+    else:
+        neurs = data['a']    
+        
+    scatter_pt = params.getint('check_pt')
+    eg1_info = ('Rufus', (15, 'CLUSTER9'))
+    key_r = list(neurs['Rufus'][0][0])
+    key_n = list(neurs['Neville'][0][0])
+    
+    if rand_eg:
+        eg1_ind = int(np.random.choice(len(key_r), 1))
+        eg2_ind = int(np.random.choice(len(key_n), 1))
+    else:
+        eg1_ind = 1
+        eg2_ind = 221        
+
+    eg1_info = ('Rufus', key_r[eg1_ind])
+    eg2_info = ('Neville', key_n[eg2_ind])
+
+    eg1_s_ax = f.add_subplot(eg1_sacc_grid)
+    eg2_s_ax = f.add_subplot(eg2_sacc_grid, sharex=eg1_s_ax, sharey=eg1_s_ax)
+    if 'a' in gen_panels:
+        m1, eg1_key = eg1_info
+        m2, eg2_key = eg2_info
+        ls = ('solid', 'dashed', 'solid', 'dashed')
+        labels_1 = ('PLT', '', 'sDMST', '')
+        labels_2 = ('', '', '', '')
+        colors = (plt_sc, plt_sc, sdms_sc, sdms_sc)
+        pl.plot_single_unit_eg(neurs[m1][0], neurs[m1][1], eg1_key,
+                               labels=labels_1, linestyles=ls,
+                               ax=eg1_s_ax, colors=colors)
+        pl.plot_single_unit_eg(neurs[m2][0], neurs[m2][1], eg2_key,
+                               labels=labels_2, ax=eg2_s_ax, linestyles=ls,
+                               colors=colors)
+        gpl.make_xaxis_scale_bar(eg2_s_ax, magnitude=50, label='time (ms)')
+        gpl.make_yaxis_scale_bar(eg2_s_ax, magnitude=35, anchor=5, double=False,
+                                 label='spikes/s')
+        gpl.make_yaxis_scale_bar(eg1_s_ax, magnitude=35, anchor=5, double=False,
+                                 label='spikes/s')
+        gpl.clean_plot_bottom(eg1_s_ax)
+    
+    # fig 2a trial selection params
+    dfunc_group = {}
+    dfunc_group['Rufus'] = (d.novin_saccin, d.famin_saccin,
+                            d.saccin_match_sdms, d.saccin_nonmatch_sdms)
+    dfunc_group['Neville'] = (d.novin_saccin_n, d.famin_saccin_n,
+                              d.saccin_match_sdms_n, d.saccout_match_sdms_n)
+
+    if 'b' not in data.keys():
+        neurs = {}
+        for m, mdata in exper_data.items():
+            mfs = (mf,)*len(dfunc_group[m])
+            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
+                                           end, binsize, binstep=binstep, 
+                                           min_trials=min_trials, zscore=zscore,
+                                           causal_timing=causal_timing,
+                                           bhv_extract_func=pl.get_sacc_vel)
+            neurs[m] = out
+        data['b'] = neurs
+    else:
+        neurs = data['b']    
+        
+    scatter_pt = params.getint('check_pt')
+    eg1_info = ('Rufus', (15, 'CLUSTER9'))
+    key_r = list(neurs['Rufus'][0][0])
+    key_n = list(neurs['Neville'][0][0])
+    
+    if rand_eg:
+        eg1_ind = int(np.random.choice(len(key_r), 1))
+        eg2_ind = int(np.random.choice(len(key_n), 1))
+        print('Rufus eg index: {}'.format(eg1_ind))
+        print('Neville eg index: {}'.format(eg2_ind))
+    else:
+        eg1_ind = 82
+        eg2_ind = 75        
+
+    eg1_info = ('Rufus', key_r[eg1_ind])
+    eg2_info = ('Neville', key_n[eg2_ind])
+
+    eg1_p_ax = f.add_subplot(eg1_prior_grid)
+    eg2_p_ax = f.add_subplot(eg2_prior_grid, sharex=eg1_p_ax, sharey=eg1_p_ax)
+    if 'b' in gen_panels:
+        m1, eg1_key = eg1_info
+        m2, eg2_key = eg2_info
+        ls = ('solid', 'dashed', 'solid', 'dashed')
+        labels_1 = ('PLT', '', 'sDMST', '')
+        labels_2 = ('', '', '', '')
+        colors = (plt_fc, plt_fc, sdms_mc, sdms_mc)
+        pl.plot_single_unit_eg(neurs[m1][0], neurs[m1][1], eg1_key,
+                               labels=labels_1, linestyles=ls,
+                               ax=eg1_p_ax, colors=colors)
+        pl.plot_single_unit_eg(neurs[m2][0], neurs[m2][1], eg2_key,
+                               labels=labels_2, ax=eg2_p_ax, linestyles=ls,
+                               colors=colors)
+        gpl.make_xaxis_scale_bar(eg2_p_ax, magnitude=50, label='time (ms)')
+        gpl.make_yaxis_scale_bar(eg2_p_ax, magnitude=25, anchor=5, double=False,
+                                 label='spikes/s')
+        gpl.make_yaxis_scale_bar(eg1_p_ax, magnitude=25, anchor=5, double=False,
+                                 label='spikes/s')
+        gpl.clean_plot_bottom(eg1_p_ax)
+
+    start_glm = params.getint('start_glm')
+    end_glm = params.getint('end_glm')
+    binsize_glm = params.getint('binsize_glm')
+    binstep_glm = params.getint('binstep_glm')
+    perms_glm = params.getint('perms_glm')
+    min_trials_glm = params.getint('min_trials_glm')
+    zscore_glm = params.getboolean('zscore_glm')
+    t_glm = params.getint('time_glm')
+    p_thr = params.getfloat('signif_level_glm')
+
+    dfunc_group_both = {}
+    dfunc_group_both['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+                                 d.saccin_nonmatch_g_sdms,
+                                 d.saccout_nonmatch_sdms,
+                                 d.novin_saccin, d.novin_saccout,
+                                 d.famin_saccin, d.famin_saccout)
+    dfunc_group_both['Neville'] = (d.saccin_match_sdms_n,
+                                   d.saccout_match_g_sdms_n,
+                                   d.saccin_nonmatch_g_sdms_n,
+                                   d.saccout_nonmatch_sdms_n,
+                                   d.novin_saccin_n, d.novin_saccout_n,
+                                   d.famin_saccin_n, d.famin_saccout_n)
+
+    glm_shape = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+                 (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
+    glm_labels_both = ('task', 'priority', 'sacc')
+
+    time_cent = 50
+    time_wid = 100
+    av_only = True
+    adapt_delta = .99
+    max_fit = None
+    req_trials = 10
+    if 'cd' not in data.keys():
+        glm_dat = {}
+        for m, mdata in exper_data.items():
+            out_both = pl.compare_models(mdata[0], time_cent, time_wid, mf,
+                                         dfunc_group_both[m], glm_shape,
+                                         glm_labels_both, av_only=av_only,
+                                         adapt_delta=adapt_delta,
+                                         min_trials=req_trials,
+                                         max_fit=max_fit)
+            glm_dat[m] = out_both
+        data['cd'] = glm_dat
+
+    # # find good way to plot model comparison result
+    # if 'cd' in gen_panels:
+    #     neurs = data['cd']
+    #     for m, d_both in neurs.items():
+    #         axs_gs = glm_axs[m]
+    #         axs = list(f.add_subplot(ax) for ax in axs_gs)
+    #         fits_m, comps_m = d_both
+    return data    
 
 def figure3(data=None, gen_panels=None, exper_data=None,
             monkey_paths=pl.monkey_paths, config_file=config_path):
@@ -367,31 +772,39 @@ def figure3(data=None, gen_panels=None, exper_data=None,
     if exper_data is None:
         exper_data = load_all_data(monkey_paths)
     if gen_panels is None:
-        gen_panels = ('ab', 'c', 'de')
+        gen_panels = ('ab', 'c', 'de', 'e', 'f')
     if data is None:
         data = {}
 
-    fsize = (4.5, 3)
+    fsize = (4.5, 4.5)
     f = plt.figure(figsize=fsize)
     gs = f.add_gridspec(100, 100)
 
-    sacc_dec_grid = gs[:48, :50]
-    sacc_pt_grid = gs[:48, 50:55]
-    
-    sacc_scatter_grid = gs[:43, 70:]
-    
-    sacc_cross_grid = gs[52:, :50]
-    sacc_cross_pt_grid = gs[52:, 50:55]
-    
-    sacc_ang_grid = gs[57:, 70:]
+    sacc_dec_grid = gs[:32, :50]
+    sacc_pt_grid = gs[:32, 50:55]
 
+    sacc_scatter_grid = gs[:28, 70:]
+    
+    sacc_cross_grid = gs[34:65, :50]
+    sacc_cross_pt_grid = gs[34:65, 50:55]
+    
+    dec_bhv_plt_grid = gs[38:60, 70:84]
+    dec_bhv_sdmst_grid = gs[38:60, 86:]
+
+    match_dec_grid = gs[67:, :50]
+    match_pt_grid = gs[67:, 50:55]
+
+    match_scatter_grid = gs[72:, 70:]
+    
     # names
     sdms_name = params.get('sdms_name')
     plt_name = params.get('plt_name')
     
     # colors
     sdms_sc = params.getcolor('sdms_sacc_color')
+    sdms_mc = params.getcolor('sdms_match_color')
     plt_sc = params.getcolor('plt_sacc_color')
+    plt_fc = params.getcolor('plt_fam_color')
     comp_c = params.getcolor('comparison_color')
     cross_color = params.getcolor('hyperplane_ang_color')
     wi_color = params.getcolor('within_ang_color')
@@ -399,6 +812,7 @@ def figure3(data=None, gen_panels=None, exper_data=None,
     r_color = params.getcolor('rufus_color')
     n_color = params.getcolor('neville_color')
     monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+    cp_color = params.getcolor('cp_bar_color')
     
     # fig 3 timing params
     start = params.getint('start')
@@ -414,41 +828,61 @@ def figure3(data=None, gen_panels=None, exper_data=None,
     equal_fold = params.getboolean('equal_fold')
     with_replace = params.getboolean('with_replace')
     kernel = params.get('kernel')
-
+    combine_monkeys = params.getboolean('combine_monkeys')
+    cumulative = params.getboolean('cumulative')
     mf = d.first_sacc_func
 
     dfunc_group = {}
     dfunc_group['Rufus'] = (d.saccin_sdms, d.saccout_sdms,
                             d.saccin_plt, d.saccout_plt)
+    dfunc_group['Neville'] = (d.saccin_sdms_n, d.saccout_sdms_n,
+                              d.saccin_plt_n, d.saccout_plt_n)
     cond_labels = (sdms_name, plt_name)
     color_dict = {sdms_name:sdms_sc, plt_name:plt_sc}
     if 'ab' not in data.keys() and 'ab' in gen_panels:
-        decs = {}
+        org_data = {}
         for m, mdata in exper_data.items():
-            out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
-                                        end, binsize, binstep, min_trials,
-                                        resample=resample, zscore=zscore,
-                                        leave_out=leave_out, kernel=kernel,
-                                        cond_labels=cond_labels,
-                                        with_replace=with_replace,
-                                        equal_fold=equal_fold,
-                                        min_spks=min_spks)
-            decs[m] = out
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks,
+                                               cumulative=cumulative)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
         data['ab'] = decs
-        
+
     check_pt = params.getfloat('check_pt')
     sacc_dec_ax = f.add_subplot(sacc_dec_grid)
     sacc_pt_ax = f.add_subplot(sacc_pt_grid, sharey=sacc_dec_ax)
     if 'ab' in gen_panels:
         decs = data['ab']
-        pl.plot_decoding_info(decs, check_pt, sacc_dec_ax, sacc_pt_ax,
-                              colors=color_dict)
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, sacc_dec_ax, sacc_pt_ax,
+                                    colors=color_dict)
+        pl.print_svm_decoding_diff(pts, 'saccade decoding, {}', cond_labels)
         gpl.make_yaxis_scale_bar(sacc_dec_ax, anchor=.5, magnitude=.5,
                                  double=False, label='decoding')
         gpl.clean_plot_bottom(sacc_dec_ax)
         gpl.clean_plot_bottom(sacc_pt_ax)
-        
+
     pop = True
+    resample_pop = params.getint('resample_pop')
     min_population = params.getint('min_population')
     zscore = params.getboolean('zscore_pop')
     equal_fold = params.getboolean('equal_fold_pop')
@@ -458,71 +892,210 @@ def figure3(data=None, gen_panels=None, exper_data=None,
         for m, mdata in exper_data.items():
             out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
                                         end, binsize, binstep, min_trials,
-                                        resample=resample, zscore=zscore,
+                                        resample=resample_pop, zscore=zscore,
                                         pop=pop, equal_fold=equal_fold, 
                                         with_replace=with_replace,
                                         min_population=min_population,
                                         leave_out=leave_out, kernel=kernel)
             decs_pop[m] = out
         data['c'] = decs_pop
+    if 'c-' not in data.keys() and 'c' in gen_panels:
+        fsps = {}
+        for m, mdata in exper_data.items():
+            args = [mdata[0], d.reading_params[m]]
+            sb, sb_inds = na.apply_function_on_runs(pl.get_side_bias,
+                                                    args, ret_index=True)
+            
+            args = [mdata[0], d.reading_params[m]]
+            ps, run_inds = na.apply_function_on_runs(pl.get_first_saccade_prob,
+                                                     args, ret_index=True)
+
+            sdms_func = pl.compute_simple_sdms_performance
+            sdms_args = [mdata[0], d.cgroups[m]]
+            sd, sdms_inds = na.apply_function_on_runs(sdms_func, sdms_args,
+                                                      ret_index=True, n_boots=1)
+            bias_dict = dict(zip(run_inds, ps))
+            side_dict = dict(zip(sb_inds, sb))
+            sdms_dict = dict(zip(sdms_inds, sd))
+            fsps[m] = (bias_dict, sdms_dict, side_dict)
+        data['c-'] = fsps
 
     sacc_scatter_ax = f.add_subplot(sacc_scatter_grid)
+    bias_plt_ax = f.add_subplot(dec_bhv_plt_grid)
+    bias_sdmst_ax = f.add_subplot(dec_bhv_sdmst_grid, sharey=bias_plt_ax)
     if 'c' in gen_panels:
         decs_pop = data['c']
-        pl.plot_svm_session_scatter(decs_pop, check_pt, sacc_scatter_ax,
-                                    colordict=monkey_colors)
+        bias_dicts = data['c-']
+        _, pts = pl.plot_svm_session_scatter(decs_pop, check_pt, sacc_scatter_ax,
+                                             colordict=monkey_colors)
+        pl.print_svm_scatter(pts, 'saccade pop')
+        pl.plot_svm_bhv_scatter(decs_pop, bias_dicts, check_pt,
+                                bias_plt_ax, bias_sdmst_ax,
+                                colordict=monkey_colors, print_=True)
+        gpl.clean_plot(bias_plt_ax, 0)
+        gpl.clean_plot(bias_sdmst_ax, 1)
+        bias_plt_ax.set_xticks([.5, .6])
+        bias_plt_ax.set_xlabel('PLT bias')
+        bias_plt_ax.set_ylabel('decoding')
+        bias_sdmst_ax.set_xlabel('sDMST\naccuracy')
+        bias_sdmst_ax.set_xticks([.75, .85])
         sacc_scatter_ax.set_xlabel('sDMST decoding')
         sacc_scatter_ax.set_ylabel('PLT decoding')
 
     dfunc_group['Rufus'] = (d.saccin_sdms, d.saccin_plt,
                             d.saccout_sdms, d.saccout_plt)
+    dfunc_group['Neville'] = (d.saccin_sdms_n, d.saccin_plt_n,
+                              d.saccout_sdms_n, d.saccout_plt_n)
     kernel = params.get('kernel_cross')
+    zscore = params.getboolean('zscore')
+    equal_fold = params.getboolean('equal_fold')
+
     dfunc_pairs = (0, 0, 0, 0)
     cond_labels = (('sDMST', 'PLT'),)
     if 'de' not in data.keys() and 'de' in gen_panels:
-        cdecs = {}
+        org_data = {}
         for m, mdata in exper_data.items():
-            out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
-                                        end, binsize, binstep, min_trials,
-                                        dfunc_pairs=dfunc_pairs,
-                                        cond_labels=cond_labels,
-                                        resample=resample, zscore=zscore,
-                                        equal_fold=equal_fold, kernel=kernel,
-                                        with_replace=with_replace,
-                                        min_population=min_population,
-                                        leave_out=leave_out, cross_dec=True)
-            cdecs[m] = out
-        data['de'] = cdecs
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks,
+                                               cross_dec=True,
+                                               dfunc_pairs=dfunc_pairs)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel, cross_dec=True,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
+        data['de'] = decs
         
     sacc_cross_ax = f.add_subplot(sacc_cross_grid, sharex=sacc_dec_ax,
                                   sharey=sacc_dec_ax)
     sacc_cross_pt_ax = f.add_subplot(sacc_cross_pt_grid,
                                      sharey=sacc_cross_ax)
-    sacc_cross_ang_ax = f.add_subplot(sacc_ang_grid)
+    # sacc_cross_ang_ax = f.add_subplot(sacc_ang_grid)
     check_pt = params.getfloat('check_pt')
     color_dict_cross = {' -> '.join((plt_name, sdms_name)):sdms_sc,
                         ' -> '.join((sdms_name, plt_name)):plt_sc}
     if 'de' in gen_panels:
         cdecs = data['de']
-        pl.plot_decoding_info(cdecs, check_pt, sacc_cross_ax,
+        pl.print_decoding_info(cdecs)
+        pts = pl.plot_decoding_info(cdecs, check_pt, sacc_cross_ax,
                               sacc_cross_pt_ax, colors=color_dict_cross)
+        pl.print_svm_decoding_diff(pts, 'saccade cross, {}', cond_labels[0])
         gpl.make_yaxis_scale_bar(sacc_cross_ax, anchor=.5, magnitude=.5,
                                  double=False, label='decoding')
-        gpl.make_xaxis_scale_bar(sacc_cross_ax, magnitude=50, label='time (ms)')
+        gpl.clean_plot_bottom(sacc_cross_ax)
         gpl.clean_plot_bottom(sacc_cross_pt_ax)
 
-        pl.plot_svm_decoding_angs(cdecs, check_pt, sacc_cross_ang_ax,
-                                  cross_color=cross_color, wi_color=wi_color,
-                                  rand_color=rand_color)
-        sacc_cross_ang_ax.set_xlabel('decoding plane angle (degrees)')
-        sacc_cross_ang_ax.set_ylabel('density')
+    mf = d.first_sacc_func
+    
+    dfunc_group = {}
+    dfunc_group['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+                            d.saccin_nonmatch_g_sdms, d.saccout_nonmatch_sdms,
+                            d.novin_saccin, d.novin_saccout,
+                            d.famin_saccin, d.famin_saccout)
+    dfunc_group['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
+                              d.saccin_nonmatch_g_sdms_n,
+                              d.saccout_nonmatch_sdms_n,
+                              d.novin_saccin_n, d.novin_saccout_n,
+                              d.famin_saccin_n, d.famin_saccout_n)
+
+    dfunc_pairs = (0, 0, 0, 0, 1, 1, 1, 1)
+    cond_labels = ('match-nonmatch', 'novel-familiar')
+    color_dict = {cond_labels[0]:sdms_mc, cond_labels[1]:plt_fc}
+    if 'e' not in data.keys() and 'e' in gen_panels:
+        org_data = {}
+        for m, mdata in exper_data.items():
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks,
+                                               dfunc_pairs=dfunc_pairs)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
+        data['e'] = decs
+
+    check_pt = params.getfloat('check_pt_img')
+    match_dec_ax = f.add_subplot(match_dec_grid)
+    match_pt_ax = f.add_subplot(match_pt_grid, sharey=match_dec_ax)
+    if 'e' in gen_panels:
+        decs = data['e']
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, match_dec_ax, match_pt_ax,
+                              colors=color_dict)
+        pl.print_svm_decoding_diff(pts, 'match decoding, {}', cond_labels)
+        gpl.make_yaxis_scale_bar(match_dec_ax, anchor=.5, magnitude=.5,
+                                 double=False, label='decoding')
+        gpl.make_xaxis_scale_bar(match_dec_ax, magnitude=20,
+                                 label='time (ms)')
+        gpl.clean_plot_bottom(match_pt_ax)
+
+    pop = True
+    resample_pop = params.getint('resample_pop')
+    min_population = params.getint('min_population')
+    zscore = params.getboolean('zscore_pop')
+    equal_fold = params.getboolean('equal_fold_pop')
+    kernel = params.get('kernel_pop')
+
+    if 'f' not in data.keys() and 'f' in gen_panels:
+        decs_pop = {}
+        for m, mdata in exper_data.items():
+            out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
+                                        end, binsize, binstep, min_trials,
+                                        dfunc_pairs=dfunc_pairs, kernel=kernel,
+                                        resample=resample_pop, zscore=zscore,
+                                        pop=pop, equal_fold=equal_fold, 
+                                        with_replace=with_replace,
+                                        min_population=min_population,
+                                        leave_out=leave_out)
+            decs_pop[m] = out
+        data['f'] = decs_pop
+
+    match_scatter_ax = f.add_subplot(match_scatter_grid)
+    if 'f' in gen_panels:
+        decs_pop = data['f']
+        _, pts = pl.plot_svm_session_scatter(decs_pop, check_pt,
+                                             match_scatter_ax,
+                                             colordict=monkey_colors)
+        pl.print_svm_scatter(pts, 'match pop', combine=True)
+        match_scatter_ax.set_xlabel('match-nonmatch decoding')
+        match_scatter_ax.set_ylabel('novel-familiar decoding')
         
     bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig3-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
-def figure4(data=None, gen_panels=None, exper_data=None,
+def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
             monkey_paths=pl.monkey_paths, config_file=config_path):
     setup()
     cf = u.ConfigParserColor()
@@ -531,12 +1104,14 @@ def figure4(data=None, gen_panels=None, exper_data=None,
     if exper_data is None:
         exper_data = load_all_data(monkey_paths)
     if gen_panels is None:
-        gen_panels = ('a', 'b', 'c', 'd', 'e')
+        gen_panels = ('c', 'd', 'e')
     if data is None:
         data = {}
 
+    sdms_tc = params.getcolor('sdms_gen_color')
     sdms_sc = params.getcolor('sdms_sacc_color')
-    sdms_mc = params.getcolor('sdms_match_color')
+    sdms_mc = params.getcolor('sdms_match_color') 
+    plt_tc = params.getcolor('plt_gen_color')
     plt_sc = params.getcolor('plt_sacc_color')
     plt_fc = params.getcolor('plt_fam_color')
     comp_c = params.getcolor('comparison_color')
@@ -547,25 +1122,21 @@ def figure4(data=None, gen_panels=None, exper_data=None,
     pro_s = params.get('pro_style')
     anti_s = params.get('anti_style')
     
-    fsize = (5.5, 6.5)
+    fsize = (5.5, 4.5)
     f = plt.figure(figsize=fsize) # , constrained_layout=True)
     gs = f.add_gridspec(100, 100)
-
-    match_dec_grid = gs[:28, :50]
-    match_pt_grid = gs[:28, 50:55]
-    match_scatter_grid = gs[:28, 65:]
     
-    time_sdms_grid = gs[35:53, :40]
-    sacc_sdms_grid = gs[58:77, :40]
-    match_sdms_grid = gs[81:, :40]
+    time_sdms_grid = gs[:32, :40]
+    sacc_sdms_grid = gs[34:65, :40]
+    match_sdms_grid = gs[67:, :40]
     
-    time_plt_grid = gs[35:53, 40:80]
-    sacc_plt_grid = gs[58:77, 40:80]
-    fam_plt_grid = gs[81:, 40:80]
+    time_plt_grid = gs[:32, 40:80]
+    sacc_plt_grid = gs[34:65, 40:80]
+    fam_plt_grid = gs[67:, 40:80]
     
-    full_ev_grid = gs[35:53, 88:]
-    sacc_latency_grid = gs[64:80, 88:]
-    match_latency_grid = gs[84:, 88:]
+    full_ev_grid = gs[:24, 92:]
+    sacc_latency_grid = gs[40:64, 92:]
+    match_latency_grid = gs[76:, 92:]
 
     
     # fig 4 timing params
@@ -582,72 +1153,7 @@ def figure4(data=None, gen_panels=None, exper_data=None,
     equal_fold = params.getboolean('equal_fold')
     with_replace = params.getboolean('with_replace')
     kernel = params.get('kernel')
-
-    mf = d.first_sacc_func
-    
-    dfunc_group = {}
-    dfunc_group['Rufus'] = (d.saccin_match_sdms, d.saccout_match_sdms,
-                            d.saccin_nonmatch_sdms, d.saccout_nonmatch_sdms,
-                            d.novin_saccin, d.novin_saccout,
-                            d.famin_saccin, d.famin_saccout)
-
-    dfunc_pairs = (0, 0, 0, 0, 1, 1, 1, 1)
-    cond_labels = ('match-nonmatch', 'novel-familiar')
-    color_dict = {cond_labels[0]:sdms_mc, cond_labels[1]:plt_fc}
-    if 'a' not in data.keys() and 'a' in gen_panels:
-        decs = {}
-        for m, mdata in exper_data.items():
-            out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start, end, 
-                                        binsize, binstep, min_trials,
-                                        resample=resample, cond_labels=cond_labels,
-                                        zscore=zscore, dfunc_pairs=dfunc_pairs,
-                                        leave_out=leave_out, kernel=kernel,
-                                        with_replace=with_replace,
-                                        equal_fold=equal_fold,
-                                        min_spks=min_spks)
-            decs[m] = out
-        data['a'] = decs
-
-    check_pt = params.getfloat('check_pt')
-    match_dec_ax = f.add_subplot(match_dec_grid)
-    match_pt_ax = f.add_subplot(match_pt_grid, sharey=match_dec_ax)
-    if 'a' in gen_panels:
-        decs = data['a']
-        pl.plot_decoding_info(decs, check_pt, match_dec_ax, match_pt_ax,
-                              colors=color_dict)
-        gpl.make_yaxis_scale_bar(match_dec_ax, anchor=.5, magnitude=.5,
-                                 double=False, label='decoding')
-        gpl.make_xaxis_scale_bar(match_dec_ax, magnitude=50,
-                                 label='time (ms)')
-        gpl.clean_plot_bottom(match_pt_ax)
-
-    pop = True
-    min_population = params.getint('min_population')
-    zscore = params.getboolean('zscore_pop')
-    equal_fold = params.getboolean('equal_fold_pop')
-    kernel = params.get('kernel_pop')
-
-    if 'b' not in data.keys() and 'b' in gen_panels:
-        decs_pop = {}
-        for m, mdata in exper_data.items():
-            out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
-                                        end, binsize, binstep, min_trials,
-                                        dfunc_pairs=dfunc_pairs, kernel=kernel,
-                                        resample=resample, zscore=zscore,
-                                        pop=pop, equal_fold=equal_fold, 
-                                        with_replace=with_replace,
-                                        min_population=min_population,
-                                        leave_out=leave_out)
-            decs_pop[m] = out
-        data['b'] = decs_pop
-
-    match_scatter_ax = f.add_subplot(match_scatter_grid)
-    if 'b' in gen_panels:
-        decs_pop = data['b']
-        pl.plot_svm_session_scatter(decs_pop, check_pt, match_scatter_ax,
-                                    colordict=monkey_colors)
-        match_scatter_ax.set_xlabel('match-nonmatch decoding')
-        match_scatter_ax.set_ylabel('novel-familiar decoding')
+    combine_monkeys = params.getboolean('combine_monkeys')
 
     start = params.getint('start_dpca')
     end = params.getint('end_dpca')
@@ -663,9 +1169,12 @@ def figure4(data=None, gen_panels=None, exper_data=None,
     mf = d.first_sacc_func
 
     dfunc_group_sdms = {}
-    dfunc_group_sdms['Rufus'] = (d.saccin_match_sdms, d.saccout_match_sdms,
-                                 d.saccin_nonmatch_sdms,
+    dfunc_group_sdms['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+                                 d.saccin_nonmatch_g_sdms,
                                  d.saccout_nonmatch_sdms)
+    dfunc_group_sdms['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
+                                   d.saccin_nonmatch_g_sdms_n,
+                                   d.saccout_nonmatch_sdms_n)
     dfunc_pts = ((0, 0), (0, 1), (1, 0), (1, 1))
     cond_labels_sdms = ('mst')
 
@@ -840,10 +1349,16 @@ def figure5(data=None, gen_panels=None, exper_data=None,
         fsps = {}
         for m, mdata in exper_data.items():
             args = [mdata[0], d.reading_params[m]]
-            ps = na.apply_function_on_runs(pl.get_first_saccade_prob, args,
+            ps = na.apply_function_on_runs(pl.get_first_saccade_prob_bs, args,
                                            conds_ref='lum_conds',
-                                           min_trials=n_trials)
+                                           min_trials=n_trials, n_boots=100)
             ps = np.array(ps)
+            intervs = np.array(list(gpl.conf95_interval(p) for p in ps))
+            upper = intervs[:, 0] < .5
+            lower = intervs[:, 1] > .5
+            print('{} sig sessions'.format(m),
+                  np.sum(np.logical_or(upper, lower)))
+            ps = np.nanmean(ps, axis=1)
             ps = ps[np.logical_not(np.isnan(ps))]
             fsps[m] = ps
         data['b'] = fsps
@@ -851,15 +1366,22 @@ def figure5(data=None, gen_panels=None, exper_data=None,
     lum_sacc_ax = f.add_subplot(lum_sacc_grid)
     if 'b' in gen_panels:
         fsps = data['b']
-        for m, ps in fsps.items():
-            lum_sacc_ax.hist(ps, density=True, histtype='step',
-                             color=monkey_colors[m])
-            gpl.add_vlines(np.nanmean(ps), lum_sacc_ax,
-                           color=monkey_colors[m])
-        lum_sacc_ax.set_xlabel('first saccade probability')
-        lum_sacc_ax.set_ylabel('session density')
-        gpl.add_vlines(.5, lum_sacc_ax)
+        for i, (m, ps) in enumerate(fsps.items()):
+            x_pos = np.array([i])
+            ps_arr = np.expand_dims(ps, axis=1)
+            p = lum_sacc_ax.violinplot(ps_arr[:, 0], positions=x_pos,
+                                       showextrema=False)
+            gpl.plot_trace_werr(x_pos, ps_arr, points=True,
+                                color=monkey_colors[m], ax=lum_sacc_ax,
+                                error_func=gpl.conf95_interval)
+            gpl.set_violin_color(p, monkey_colors[m])
+        lum_sacc_ax.set_ylabel('luminance bias')
+        lum_sacc_ax.set_xticks(range(len(fsps)))
+        lum_sacc_ax.set_xticklabels(list(fsps.keys()), rotation=90)
+        gpl.clean_plot_bottom(lum_sacc_ax, keeplabels=True)
+        gpl.add_hlines(.5, lum_sacc_ax)
         gpl.clean_plot(lum_sacc_ax, 0)
+        lum_sacc_ax.set_yticks([.4, .5, .6])
     # fig 5 timing params
     start = params.getint('start')
     end = params.getint('end')
@@ -880,6 +1402,7 @@ def figure5(data=None, gen_panels=None, exper_data=None,
     # fig 5 trial selection params
     dfunc_group = {}
     dfunc_group['Rufus'] = (d.saccin_lum, d.saccin_sdms)
+    dfunc_group['Neville'] = (d.saccin_lum_n, d.saccin_sdms_n)
 
     if 'cde' not in data.keys() and ('c' in gen_panels or 'd' in gen_panels
                                      or 'e' in gen_panels):
@@ -897,33 +1420,54 @@ def figure5(data=None, gen_panels=None, exper_data=None,
         neurs = data['cde']    
 
     latt_group = (0, 1)
-    sacc_ax = f.add_subplot(lum_latency_grid)
+    latt_ax = f.add_subplot(lum_latency_grid)
     if 'c' in gen_panels:
+        p_lat_all = np.array([])
+        s_lat_all = np.array([])
         for m, dat in exper_data.items():
             p_lat, s_lat = pl.compile_saccade_latencies(dat[0], dfunc_group[m],
                                                         latt_group)
-            sacc_ax.hist(p_lat, label='PLT', density=True, histtype='step',
-                         color=plt_sc)
-            sacc_ax.hist(s_lat, label='sDMST', density=True, histtype='step',
-                         color=sdms_sc)
-            gpl.add_vlines(np.mean(p_lat), sacc_ax, color=plt_sc)
-            gpl.add_vlines(np.mean(s_lat), sacc_ax, color=sdms_sc)
-            gpl.clean_plot(sacc_ax, 0)
-        sacc_ax.set_xlabel('first saccade latency (ms)')
-        sacc_ax.set_ylabel('density')
+            p_lat = np.array(p_lat[0]) 
+            s_lat = np.array(s_lat[0])
+            gpl.print_mean_conf95(p_lat, m, 'saccade latency, lumPLT',
+                              n_boots=n_boots)
+            gpl.print_mean_conf95(s_lat, m, 'saccade latency, sDMST',
+                              n_boots=n_boots)
+            gpl.print_diff_conf95(p_lat, s_lat, m, 'latency diff',
+                                  n_boots=n_boots)
+            p_lat_all = np.concatenate((p_lat_all, p_lat))
+            s_lat_all = np.concatenate((s_lat_all, s_lat))
+        gpl.print_mean_conf95(p_lat_all, 'combined', 'saccade latency, lumPLT',
+                              n_boots=n_boots)
+        gpl.print_mean_conf95(s_lat_all, 'combined', 'saccade latency, sDMST',
+                              n_boots=n_boots)
+        gpl.print_diff_conf95(p_lat_all, s_lat_all, 'combined', 'latency diff',
+                              n_boots=n_boots)
+        latt_ax.hist(p_lat_all, label='PLT', density=True, histtype='step',
+                     color=plt_sc)
+        latt_ax.hist(s_lat_all, label='sDMST', density=True, histtype='step',
+                     color=sdms_sc)
+        gpl.clean_plot(latt_ax, 0)
+        latt_ax.set_xlabel('first saccade\nlatency (ms)')
+        latt_ax.set_xlim([0, 600])
+        gpl.make_yaxis_scale_bar(latt_ax, anchor=0, magnitude=.01, double=False,
+                                 label='density', text_buff=.4)
         
-    eg1_key = {'Rufus':(37, 'CLUSTER36')}
-    eg2_key = {'Rufus':(15, 'CLUSTER9')}
+    eg1_info = ('Rufus', (15, 'CLUSTER9'))
+    eg2_info = ('Neville', (6, 'CLUSTER28'))
     eg1_ax = f.add_subplot(lum_eg1_grid)
     eg2_ax = f.add_subplot(lum_eg2_grid, sharex=eg1_ax, sharey=eg1_ax)
     if 'd' in gen_panels:
-        for m, (neur, xs) in neurs.items():
-            pl.plot_single_unit_eg(neur, xs, eg1_key[m],
-                                   labels=('lumPLT', 'sDMST'),
-                                   ax=eg1_ax, colors=(plt_sc, sdms_sc))
-            pl.plot_single_unit_eg(neur, xs, eg2_key[m],
-                                   labels=('', ''),
-                                   ax=eg2_ax, colors=(plt_sc, sdms_sc))
+        m1, eg1_key = eg1_info
+        m2, eg2_key = eg2_info
+        print('{}: {} neurons, task'.format(m1, len(neurs[m1][0][0])))
+        print('{}: {} neurons, task'.format(m2, len(neurs[m2][0][0])))
+        pl.plot_single_unit_eg(neurs[m1][0], neurs[m1][1], eg1_key,
+                               labels=('lumPLT', 'sDMST'),
+                               ax=eg1_ax, colors=(plt_sc, sdms_sc))
+        pl.plot_single_unit_eg(neurs[m2][0], neurs[m2][1], eg2_key,
+                               labels=('', ''), ax=eg2_ax,
+                               colors=(plt_sc, sdms_sc))
         gpl.make_yaxis_scale_bar(eg1_ax, magnitude=10, anchor=5, label='spikes/s',
                                  double=False)
         gpl.make_yaxis_scale_bar(eg2_ax, magnitude=10, anchor=5, label='spikes/s',
@@ -937,8 +1481,15 @@ def figure5(data=None, gen_panels=None, exper_data=None,
     scatter_ax = f.add_subplot(lum_scatter_grid)
     if 'e' in gen_panels:
         for m, neur in neurs.items():
-            pl.plot_neuron_scatters(neur, scatter_pt, lims=lims, boots=boots,
-                                    ax=scatter_ax, color=monkey_colors[m])
+            _, pts = pl.plot_neuron_scatters(neur, scatter_pt, lims=lims,
+                                             boots=boots, ax=scatter_ax,
+                                             color=monkey_colors[m])
+            task_diffs = np.diff(np.mean(pts[..., 0], axis=2), axis=1)
+            n_greater_task = np.sum(task_diffs > 0)
+            s_temp = '{}: {} neurons fire more in sDMST, {}'
+            print(s_temp.format(m, n_greater_task, 'task'))
+
+
         scatter_ax.set_xlabel('lumPLT activity (spikes/s)')
         scatter_ax.set_ylabel('sDMST activity (spikes/s)')
         
@@ -973,6 +1524,7 @@ def figure6(data=None, gen_panels=None, exper_data=None,
     r_color = params.getcolor('rufus_color')
     n_color = params.getcolor('neville_color')
     monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+    combine_monkeys = params.getboolean('combine_monkeys')
 
     lum_sacc_grid = gs[:48, :50]
     lum_sacc_pt_grid = gs[:48, 50:55]
@@ -1002,21 +1554,35 @@ def figure6(data=None, gen_panels=None, exper_data=None,
     dfunc_group = {}
     dfunc_group['Rufus'] = (d.saccin_sdms, d.saccout_sdms,
                             d.saccin_lum, d.saccout_lum)
+    dfunc_group['Neville'] = (d.saccin_sdms_n, d.saccout_sdms_n,
+                            d.saccin_lum_n, d.saccout_lum_n)
     cond_labels = ('sDMST', 'lumPLT')
     color_dict = {cond_labels[0]:sdms_sc, cond_labels[1]:plt_sc}
-
     if 'a' not in data.keys() and 'a' in gen_panels:
-        decs = {}
+        org_data = {}
         for m, mdata in exper_data.items():
-            out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
-                                        end, binsize, binstep, min_trials,
-                                        resample=resample, zscore=zscore,
-                                        leave_out=leave_out,
-                                        cond_labels=cond_labels,
-                                        with_replace=with_replace,
-                                        equal_fold=equal_fold,
-                                        min_spks=min_spks, kernel=kernel)
-            decs[m] = out
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
         data['a'] = decs
         
     check_pt = params.getfloat('check_pt')
@@ -1024,14 +1590,16 @@ def figure6(data=None, gen_panels=None, exper_data=None,
     lum_sacc_pt_ax = f.add_subplot(lum_sacc_pt_grid, sharey=lum_sacc_ax)
     if 'a' in gen_panels:
         decs = data['a']
-        pl.plot_decoding_info(decs, check_pt, lum_sacc_ax, lum_sacc_pt_ax,
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, lum_sacc_ax, lum_sacc_pt_ax,
                               colors=color_dict)
-        gpl.make_yaxis_scale_bar(lum_sacc_ax, magnitude=.5, anchor=.5, label='decoding',
-                                 double=False)
+        pl.print_svm_decoding_diff(pts, 'lum saccade decoding, {}', cond_labels)
+        gpl.make_yaxis_scale_bar(lum_sacc_ax, magnitude=.5, anchor=.5,
+                                 label='decoding', double=False)
         gpl.clean_plot_bottom(lum_sacc_ax)
         gpl.clean_plot_bottom(lum_sacc_pt_ax)
-
     pop = True
+    resample_pop = params.getint('resample_pop')
     min_population = params.getint('min_population')
     zscore = params.getboolean('zscore_pop')
     equal_fold = params.getboolean('equal_fold_pop')
@@ -1041,7 +1609,7 @@ def figure6(data=None, gen_panels=None, exper_data=None,
         for m, mdata in exper_data.items():
             out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
                                         end, binsize, binstep, min_trials,
-                                        resample=resample, zscore=zscore,
+                                        resample=resample_pop, zscore=zscore,
                                         pop=pop, equal_fold=equal_fold, 
                                         with_replace=with_replace,
                                         min_population=min_population,
@@ -1052,8 +1620,10 @@ def figure6(data=None, gen_panels=None, exper_data=None,
     lum_sacc_scatter_ax = f.add_subplot(lum_sacc_scatter_grid)
     if 'b' in gen_panels:
         decs_pop = data['b']
-        pl.plot_svm_session_scatter(decs_pop, check_pt, lum_sacc_scatter_ax,
-                                    colordict=monkey_colors)
+        _, pts = pl.plot_svm_session_scatter(decs_pop, check_pt,
+                                             lum_sacc_scatter_ax,
+                                             colordict=monkey_colors)
+        pl.print_svm_scatter(pts, 'sacc pop', combine=True)
         lum_sacc_scatter_ax.set_xlabel('sDMST decoding')
         lum_sacc_scatter_ax.set_ylabel('lumPLT decoding')
 
@@ -1062,38 +1632,60 @@ def figure6(data=None, gen_panels=None, exper_data=None,
                             d.saccin_nonmatch_sdms, d.saccout_nonmatch_sdms,
                             d.saccin_high_lum, d.saccout_high_lum,
                             d.saccin_low_lum, d.saccout_low_lum)
+    dfunc_group['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_sdms_n,
+                              d.saccin_nonmatch_sdms_n, d.saccout_nonmatch_sdms_n,
+                              d.saccin_high_lum_n, d.saccout_high_lum_n,
+                              d.saccin_low_lum_n, d.saccout_low_lum_n)
     dfunc_pairs = (0, 0, 0, 0, 1, 1, 1, 1)
     cond_labels = ('sDMST', 'lumPLT')
     color_dict = {cond_labels[0]:sdms_mc, cond_labels[1]:plt_fc}
     kernel = params.get('kernel')
+    zscore = params.getboolean('zscore')
+    equal_fold = params.getboolean('equal_fold')
     if 'c' not in data.keys() and 'c' in gen_panels:
-        decs = {}
+        org_data = {}
         for m, mdata in exper_data.items():
-            out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
-                                        end, binsize, binstep, min_trials,
-                                        resample=resample, zscore=zscore,
-                                        leave_out=leave_out,
-                                        dfunc_pairs=dfunc_pairs,
-                                        cond_labels=cond_labels,
-                                        with_replace=with_replace,
-                                        equal_fold=equal_fold,
-                                        min_spks=min_spks, kernel=kernel)
-            decs[m] = out
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks,
+                                               dfunc_pairs=dfunc_pairs)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
         data['c'] = decs
         
-    check_pt = params.getfloat('check_pt')
+    check_pt = params.getfloat('check_pt_img')
     lum_sal_ax = f.add_subplot(lum_sal_grid)
     lum_sal_pt_ax = f.add_subplot(lum_sal_pt_grid, sharey=lum_sal_ax)
     if 'c' in gen_panels:
         decs = data['c']
-        pl.plot_decoding_info(decs, check_pt, lum_sal_ax, lum_sal_pt_ax,
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, lum_sal_ax, lum_sal_pt_ax,
                               colors=color_dict)
+        pl.print_svm_decoding_diff(pts, 'lum decoding, {}', cond_labels)
         gpl.make_yaxis_scale_bar(lum_sal_ax, magnitude=.5, anchor=.5,
                                  label='decoding', double=False)
-        gpl.make_xaxis_scale_bar(lum_sal_ax, magnitude=50, label='time (ms)')
+        gpl.make_xaxis_scale_bar(lum_sal_ax, magnitude=20, label='time (ms)')
         gpl.clean_plot_bottom(lum_sal_pt_ax)
 
     pop = True
+    resample_pop = params.getint('resample_pop')
     min_population = params.getint('min_population')
     zscore = params.getboolean('zscore_pop')
     equal_fold = params.getboolean('equal_fold_pop')
@@ -1104,7 +1696,7 @@ def figure6(data=None, gen_panels=None, exper_data=None,
             out = pl.organize_svm_pairs(mdata[0], dfunc_group[m], mf, start,
                                         end, binsize, binstep, min_trials,
                                         dfunc_pairs=dfunc_pairs,
-                                        resample=resample, zscore=zscore,
+                                        resample=resample_pop, zscore=zscore,
                                         pop=pop, equal_fold=equal_fold, 
                                         with_replace=with_replace,
                                         min_population=min_population,
@@ -1115,8 +1707,10 @@ def figure6(data=None, gen_panels=None, exper_data=None,
     lum_sal_scatter_ax = f.add_subplot(lum_sal_scatter_grid)
     if 'd' in gen_panels:
         decs_pop = data['d']
-        pl.plot_svm_session_scatter(decs_pop, check_pt, lum_sal_scatter_ax,
-                                    colordict=monkey_colors)
+        _, pts = pl.plot_svm_session_scatter(decs_pop, check_pt,
+                                             lum_sal_scatter_ax,
+                                             colordict=monkey_colors)
+        pl.print_svm_scatter(pts, 'lum pop', combine=True)
         lum_sal_scatter_ax.set_xlabel('sDMST decoding')
         lum_sal_scatter_ax.set_ylabel('lumPLT decoding')
         
@@ -1124,6 +1718,525 @@ def figure6(data=None, gen_panels=None, exper_data=None,
     fname = os.path.join(bf, 'fig6-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
+
+def figure_si_bhv(data=None, gen_panels=None, exper_data=None,
+                  monkey_paths=pl.monkey_paths, config_file=config_path):
+    setup()
+    cf = u.ConfigParserColor()
+    cf.read(config_file)
+    params = cf['figure_bhv']
+    if exper_data is None:
+        exper_data = load_all_data(monkey_paths)
+    if gen_panels is None:
+        gen_panels = ('abc',)
+    if data is None:
+        data = {}
+
+    # fig SI-BHV arrangement
+    fsize = (4, 3)
+    f = plt.figure(figsize=fsize)
+    gs = f.add_gridspec(100, 100)
+
+    comp_c = params.getcolor('comparison_color')
+    r_color = params.getcolor('rufus_color')
+    n_color = params.getcolor('neville_color')
+    monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+    
+    combine_monkeys = params.getboolean('combine_monkeys')
+
+    fs_bias_grid = gs[:40, :30]
+    lt_bias_grid = gs[:40, 36:63]
+    mt_corr_grid = gs[:40, 69:]
+    
+    fs_time_scatter_grid = gs[55:, :43]
+    fs_sal_scatter_grid = gs[55:, 57:]
+
+    if 'abc' not in data.keys() and 'abc' in gen_panels:
+        sbps = {}
+        fsps = {}
+        tbps = {}
+        ltime_totals = {}
+        bias_dicts = {}
+        for m, mdata in exper_data.items():
+            
+            bias_func = pl.get_side_bias
+            bias_args = [mdata[0], d.reading_params[m]]
+            sb, sb_inds = na.apply_function_on_runs(bias_func, bias_args,
+                                                    ret_index=True)
+            sb = np.array(sb)
+            sb_dict = dict(zip(sb_inds, np.abs(sb - .5) + .5))
+            sb = sb[np.logical_not(np.isnan(sb))]
+            sbps[m] = sb
+            
+            args = [mdata[0], d.reading_params[m]]
+            out = na.apply_function_on_runs(pl.get_first_saccade_prob, args,
+                                            ret_index=True)
+            ps, run_inds = out
+            ps = np.array(ps)
+            fs_bias_dict = dict(zip(run_inds, np.abs(ps - .5) + .5))
+            ps = ps[np.logical_not(np.isnan(ps))]
+            fsps[m] = ps
+
+            ltime_total = pl.get_time_bias(mdata[0], d.reading_params[m])
+            ltime_totals[m] = ltime_total
+            
+            args = [mdata[0], d.reading_params[m]]
+            out = na.apply_function_on_runs(pl.get_time_bias, args,
+                                            ret_index=True)
+            ps, run_inds = out
+            ps = np.array(ps)
+            tb_bias_dict = dict(zip(run_inds, np.abs(ps)))
+            ps = ps[np.logical_not(np.isnan(ps))]
+            tbps[m] = ps
+
+            bias_dicts[m] = fs_bias_dict, tb_bias_dict, sb_dict
+        data['abc'] = fsps, tbps, sbps, bias_dicts, ltime_totals
+
+    fs_bias_ax = f.add_subplot(fs_bias_grid)
+    lt_bias_ax = f.add_subplot(lt_bias_grid, sharey=fs_bias_ax)
+    mt_corr_ax = f.add_subplot(mt_corr_grid, sharey=fs_bias_ax)
+    
+    fs_lt_scatter_ax = f.add_subplot(fs_time_scatter_grid)
+    fs_sal_scatter_ax = f.add_subplot(fs_sal_scatter_grid)
+    
+    if 'abc' in gen_panels:
+        fsps, tbps, sbps, bias_dicts, ltime_totals = data['abc']
+        for m, mdata in exper_data.items():
+            fs_bias_ax.hist(fsps[m], histtype='step',
+                            color=monkey_colors[m])
+            lt_bias_ax.hist(tbps[m], histtype='step',
+                            color=monkey_colors[m])
+            mt_corr_ax.hist(sbps[m], histtype='step',
+                            color=monkey_colors[m])
+
+            gpl.print_mean_conf95(tbps[m], m, 'looking time')
+            gpl.print_mean_conf95(sbps[m], m, 'side bias')
+            gpl.print_corr_conf95(tbps[m], fsps[m], m, 'time-FS corr')
+            gpl.print_corr_conf95(sbps[m], fsps[m], m, 'side-FS corr')
+
+            b_p, b_t, b_s = bias_dicts[m]
+            b_zip = np.array(list((p, b_t[k], b_s[k])
+                                  for k, p in b_p.items()))
+            fs_lt_scatter_ax.plot(b_zip[:, 0], b_zip[:, 1], 'o',
+                                  color=monkey_colors[m])
+            fs_sal_scatter_ax.plot(b_zip[:, 0], b_zip[:, 2], 'o',
+                                  color=monkey_colors[m])
+        gpl.make_yaxis_scale_bar(fs_bias_ax, magnitude=5, anchor=0,
+                                 label='sessions', double=False,
+                                 text_buff=.25)
+        fs_bias_ax.set_xlabel('first saccade bias')
+        fs_bias_ax.set_xticks([.4, .5, .6])
+        lt_bias_ax.set_xlabel('looking time bias')
+        lt_bias_ax.set_xticks([-.5, 0, .5])
+        mt_corr_ax.set_xlabel('side bias')
+        mt_corr_ax.set_xticks([.3, .5, .7])
+        gpl.make_xaxis_scale_bar(fs_lt_scatter_ax, magnitude=.1, anchor=.5,
+                                 label='first saccade bias', double=False,
+                                 text_buff=.25)
+        gpl.make_yaxis_scale_bar(fs_lt_scatter_ax, magnitude=.3, anchor=0,
+                                 label='looking time bias', double=False,
+                                 text_buff=.25)
+        gpl.make_xaxis_scale_bar(fs_sal_scatter_ax, magnitude=.1, anchor=.5,
+                                 label='first saccade bias', double=False,
+                                 text_buff=.25)
+        gpl.make_yaxis_scale_bar(fs_sal_scatter_ax, magnitude=.1, anchor=.5,
+                                 label='side bias', double=False,
+                                 text_buff=.25)
+        gpl.clean_plot(fs_bias_ax, 0)
+        gpl.clean_plot(lt_bias_ax, 1)
+        gpl.clean_plot(mt_corr_ax, 1)
+        gpl.clean_plot(fs_lt_scatter_ax, 0)
+        gpl.clean_plot(fs_sal_scatter_ax, 0)
+
+    bf = params.get('basefolder')
+    fname = os.path.join(bf, 'si-bhv-py.svg')
+    f.savefig(fname, bbox_inches='tight', transparent=True)
+    return data
+
+def figure_si_sal(data=None, gen_panels=None, exper_data=None,
+                  monkey_paths=pl.monkey_paths, config_file=config_path):
+    setup()
+    cf = u.ConfigParserColor()
+    cf.read(config_file)
+    params = cf['figure_sal']
+    if exper_data is None:
+        exper_data = load_all_data(monkey_paths)
+    if gen_panels is None:
+        gen_panels = ('ab',)
+    if data is None:
+        data = {}
+
+    # fig SI-SAL arrangement
+    fsize = (4.25, 2)
+    f = plt.figure(figsize=fsize)
+    gs = f.add_gridspec(100, 100)
+
+    comp_c = params.getcolor('comparison_color')
+    r_color = params.getcolor('rufus_color')
+    n_color = params.getcolor('neville_color')
+    monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+
+    r_folder = params.get('rufus_familiar_folder')
+    n_folder = params.get('neville_familiar_folder')
+    monkey_folders = {'Rufus':r_folder, 'Neville':n_folder}
+    n_boots = params.getint('n_boots_bhv')    
+    
+    combine_monkeys = params.getboolean('combine_monkeys')
+
+    time_sal_scatter_grid = gs[:, :45]
+    fs_sal_scatter_grid = gs[:, 55:]
+
+    if 'ab' not in data.keys() and 'ab' in gen_panels:
+        bias_dicts = {}
+        for m, mdata in exper_data.items():
+                        
+            args = [mdata[0], d.reading_params[m]]
+            out = na.apply_function_on_runs(pl.get_first_saccade_prob, args,
+                                            ret_index=True)
+            ps, run_inds = out
+            ps = np.array(ps)
+            fs_bias_dict = dict(zip(run_inds, ps))
+
+            args = [mdata[0], d.reading_params[m]]
+            out = na.apply_function_on_runs(pl.get_time_bias, args,
+                                            ret_index=True)
+            ps, run_inds = out
+            ps = np.array(ps)
+            tb_bias_dict = dict(zip(run_inds, ps))
+
+            args = [mdata[0], d.reading_params[m], monkey_folders[m]]
+            out = na.apply_function_on_runs(pl.get_sal_bias, args,
+                                            ret_index=True)
+            sal, run_inds = out
+            sal = np.array(sal)
+            sal_bias_dict = dict(zip(run_inds, sal))
+
+            args = [mdata[0], d.reading_params[m], monkey_folders[m]]
+            out = na.apply_function_on_runs(pl.get_sal_bias, args,
+                                            ret_index=True, time=True)
+            sal_time, run_inds = out
+            sal = np.array(sal)
+            sal_time_bias_dict = dict(zip(run_inds, sal_time))
+            
+            bias_dicts[m] = (fs_bias_dict, tb_bias_dict, sal_bias_dict,
+                             sal_time_bias_dict)
+        data['ab'] = bias_dicts
+
+    time_sal_scatter_ax = f.add_subplot(time_sal_scatter_grid, aspect='equal')
+    fs_sal_scatter_ax = f.add_subplot(fs_sal_scatter_grid, aspect='equal')
+    
+    if 'ab' in gen_panels:
+        bias_dicts = data['ab']
+        for m, mdata in exper_data.items():
+            b_fs, b_tb, b_sal, b_saltime = bias_dicts[m]
+            b_zip = np.array(list((p, b_tb[k], b_sal[k], b_saltime[k])
+                                  for k, p in b_fs.items()))
+            fs_sal_scatter_ax.plot(b_zip[:, 0], b_zip[:, 2], 'o',
+                                  color=monkey_colors[m])
+            time_sal_scatter_ax.plot(b_zip[:, 1], b_zip[:, 3], 'o',
+                                     color=monkey_colors[m])
+            gpl.print_mean_conf95(b_zip[:, 2], m, 'sal FS bias', n_boots=n_boots)
+            gpl.print_mean_conf95(b_zip[:, 3], m, 'sal time bias', n_boots=n_boots)
+        fs_sal_scatter_ax.set_title('first saccade')
+        gpl.make_xaxis_scale_bar(fs_sal_scatter_ax, magnitude=.1, anchor=.5,
+                                 label='familiarity', double=False,
+                                 text_buff=.15)
+        gpl.make_yaxis_scale_bar(fs_sal_scatter_ax, magnitude=.1, anchor=.5,
+                                 label='salience', double=True,
+                                 text_buff=.38)
+
+        time_sal_scatter_ax.set_title('looking time')
+        gpl.make_xaxis_scale_bar(time_sal_scatter_ax, magnitude=.3, anchor=0,
+                                 label='familiarity', double=False,
+                                 text_buff=.30)
+        gpl.make_yaxis_scale_bar(time_sal_scatter_ax, magnitude=.1, anchor=0,
+                                 label='salience', double=True,
+                                 text_buff=.25)
+
+        
+        gpl.clean_plot(time_sal_scatter_ax, 0)
+        gpl.clean_plot(fs_sal_scatter_ax, 0)
+
+    bf = params.get('basefolder')
+    fname = os.path.join(bf, 'si-sal-py.svg')
+    f.savefig(fname, bbox_inches='tight', transparent=True)
+    return data
+
+def figure_si_spatial(data=None, gen_panels=None, exper_data=None,
+                      monkey_paths=pl.monkey_paths, config_file=config_path):
+    setup()
+    cf = u.ConfigParserColor()
+    cf.read(config_file)
+    params = cf['figure_spatial']
+    if exper_data is None:
+        exper_data = load_all_data(monkey_paths)
+    if gen_panels is None:
+        gen_panels = ('a', 'b', 'c', 'd')
+    if data is None:
+        data = {}
+
+    # fig SI-SPATIAL arrangement
+    fsize = (5, 3)
+    f = plt.figure(figsize=fsize)
+    gs = f.add_gridspec(100, 100)
+
+    sdms_sc = params.getcolor('sdms_sacc_color')
+    sdms_mc = params.getcolor('sdms_match_color')
+    plt_sc = params.getcolor('plt_sacc_color')
+    plt_fc = params.getcolor('plt_fam_color')
+    comp_c = params.getcolor('comparison_color')
+    r_color = params.getcolor('rufus_color')
+    n_color = params.getcolor('neville_color')
+    monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+    combine_monkeys = params.getboolean('combine_monkeys')
+
+    img_sacc_grid = gs[:48, :40]
+    img_sacc_pt_grid = gs[:48, 40:45]
+    lum_sacc_grid = gs[:48, 50:95]
+    lum_sacc_pt_grid = gs[:48, 95:]
+
+    img_sal_grid = gs[52:, :40]
+    img_sal_pt_grid = gs[52:, 40:45]
+    lum_sal_grid = gs[52:, 50:95]
+    lum_sal_pt_grid = gs[52:, 95:]
+
+    # fig SI-SPATIAL params
+    start = params.getint('start')
+    end = params.getint('end')
+    binsize = params.getint('binsize')
+    binstep = params.getint('binstep')
+    
+    min_trials = params.getint('min_trials')
+    min_spks = params.getint('min_spks')
+    zscore = params.getboolean('zscore')
+    resample = params.getint('resample')
+    leave_out = params.getfloat('leave_out')
+    equal_fold = params.getboolean('equal_fold')
+    with_replace = params.getboolean('with_replace')
+    kernel = params.get('kernel')
+
+    mf = d.first_sacc_func
+
+    dfunc_group = {}
+    dfunc_group['Rufus'] = (d.saccin_plt, d.saccout_plt,
+                            d.saccin_plt_close, d.saccout_plt_close)
+    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccout_plt_n,
+                              d.saccin_plt_close_n, d.saccout_plt_close_n)
+    cond_labels = ('PLT', 'close PLT')
+    color_dict = {cond_labels[0]:sdms_sc, cond_labels[1]:plt_sc}
+    if 'a' not in data.keys() and 'a' in gen_panels:
+        org_data = {}
+        for m, mdata in exper_data.items():
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
+        data['a'] = decs
+        
+    check_pt = params.getfloat('check_pt')
+    img_sacc_ax = f.add_subplot(img_sacc_grid)
+    img_sacc_pt_ax = f.add_subplot(img_sacc_pt_grid, sharey=img_sacc_ax)
+    if 'a' in gen_panels:
+        decs = data['a']
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, img_sacc_ax, img_sacc_pt_ax,
+                                    colors=color_dict)
+        pl.print_svm_decoding_diff(pts, 'saccade decoding, {}', cond_labels)
+
+        gpl.make_yaxis_scale_bar(img_sacc_ax, magnitude=.5, anchor=.5,
+                                 label='decoding', double=False)
+        gpl.clean_plot_bottom(img_sacc_ax)
+        gpl.clean_plot_bottom(img_sacc_pt_ax)
+
+    dfunc_group['Rufus'] = (d.saccin_lum, d.saccout_lum,
+                            d.saccin_lum_close, d.saccout_lum_close)
+    dfunc_group['Neville'] = (d.saccin_lum_n, d.saccout_lum_n,
+                              d.saccin_lum_close_n, d.saccout_lum_close_n)
+    cond_labels = ('lumPLT', 'close lumPLT')
+    color_dict = {cond_labels[0]:sdms_sc, cond_labels[1]:plt_sc}
+    if 'b' not in data.keys() and 'b' in gen_panels:
+        org_data = {}
+        for m, mdata in exper_data.items():
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
+        data['b'] = decs
+
+    check_pt = params.getfloat('check_pt')
+    lum_sacc_ax = f.add_subplot(lum_sacc_grid, sharey=img_sacc_ax)
+    lum_sacc_pt_ax = f.add_subplot(lum_sacc_pt_grid, sharey=lum_sacc_ax)
+    if 'b' in gen_panels:
+        decs = data['b']
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, lum_sacc_ax, lum_sacc_pt_ax,
+                                    colors=color_dict)
+        pl.print_svm_decoding_diff(pts, 'lum saccade decoding, {}', cond_labels)
+
+        gpl.clean_plot(lum_sacc_ax, 1)
+        gpl.clean_plot_bottom(lum_sacc_ax)
+        gpl.clean_plot_bottom(lum_sacc_pt_ax)
+
+    dfunc_group = {}
+    dfunc_group['Rufus'] = (d.novin_saccin, d.novin_saccout,
+                            d.famin_saccin, d.famin_saccout,
+                            d.novin_saccin_close, d.novin_saccout_close,
+                            d.famin_saccin_close, d.famin_saccout_close)
+    dfunc_group['Neville'] = (d.novin_saccin_n, d.novin_saccout_n,
+                              d.famin_saccin_n, d.famin_saccout_n,
+                              d.novin_saccin_close_n, d.novin_saccout_close_n,
+                              d.famin_saccin_close_n, d.famin_saccout_close_n)
+
+    dfunc_pairs = (0, 0, 0, 0, 1, 1, 1, 1)
+    cond_labels = ('PLT', 'close PLT')
+    color_dict = {cond_labels[0]:sdms_mc, cond_labels[1]:plt_fc}
+    kernel = params.get('kernel')
+    zscore = params.getboolean('zscore')
+    equal_fold = params.getboolean('equal_fold')
+    if 'c' not in data.keys() and 'c' in gen_panels:
+        org_data = {}
+        for m, mdata in exper_data.items():
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks,
+                                               dfunc_pairs=dfunc_pairs)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
+        data['c'] = decs
+        
+    check_pt = params.getfloat('check_pt_img')
+    img_sal_ax = f.add_subplot(img_sal_grid)
+    img_sal_pt_ax = f.add_subplot(img_sal_pt_grid, sharey=img_sal_ax)
+    if 'c' in gen_panels:
+        decs = data['c']
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, img_sal_ax, img_sal_pt_ax,
+                                    colors=color_dict)
+        pl.print_svm_decoding_diff(pts, 'sal decoding, {}', cond_labels)
+
+        gpl.make_yaxis_scale_bar(img_sal_ax, magnitude=.5, anchor=.5,
+                                 label='decoding', double=False)
+        gpl.make_xaxis_scale_bar(img_sal_ax, magnitude=20, label='time (ms)')
+        gpl.clean_plot_bottom(img_sal_pt_ax)
+
+    dfunc_group['Rufus'] = (d.saccin_high_lum, d.saccout_high_lum,
+                            d.saccin_low_lum, d.saccout_low_lum,
+                            d.saccin_high_lum_close, d.saccout_high_lum_close,
+                            d.saccin_low_lum_close, d.saccout_low_lum_close)
+    dfunc_group['Neville'] = (d.saccin_high_lum_n,
+                              d.saccout_high_lum_n,
+                              d.saccin_low_lum_n,
+                              d.saccout_low_lum_n,
+                              d.saccin_high_lum_close_n,
+                              d.saccout_high_lum_close_n,
+                              d.saccin_low_lum_close_n,
+                              d.saccout_low_lum_close_n)
+    cond_labels = ('lumPLT', 'close lumPLT')
+    color_dict = {cond_labels[0]:sdms_mc, cond_labels[1]:plt_fc}
+    kernel = params.get('kernel')
+    zscore = params.getboolean('zscore')
+    equal_fold = params.getboolean('equal_fold')
+    if 'd' not in data.keys() and 'd' in gen_panels:
+        org_data = {}
+        for m, mdata in exper_data.items():
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks,
+                                               dfunc_pairs=dfunc_pairs)
+            org_data[m] = out
+        if combine_monkeys:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
+        data['d'] = decs
+        
+    check_pt = params.getfloat('check_pt_img')
+    lum_sal_ax = f.add_subplot(lum_sal_grid, sharey=img_sal_ax)
+    lum_sal_pt_ax = f.add_subplot(lum_sal_pt_grid, sharey=lum_sal_ax)
+    if 'd' in gen_panels:
+        decs = data['d']
+        pl.print_decoding_info(decs)
+        pts = pl.plot_decoding_info(decs, check_pt, lum_sal_ax, lum_sal_pt_ax,
+                                    colors=color_dict)
+        pl.print_svm_decoding_diff(pts, 'lum decoding, {}', cond_labels)
+
+        gpl.make_xaxis_scale_bar(lum_sal_ax, magnitude=20, label='time (ms)')
+        gpl.clean_plot(lum_sal_ax, 1)
+        gpl.clean_plot_bottom(lum_sal_pt_ax)
+
+    bf = params.get('basefolder')
+    fname = os.path.join(bf, 'si-spatial-py.svg')
+    f.savefig(fname, bbox_inches='tight', transparent=True)
+    return data
+
+
 
 def figure1_old():
     start = params.getint('start_bhv')
@@ -1222,3 +2335,82 @@ def figure4_old():
             for t in trajs:
                 pl.plot_svm_trajectory(t, task_traj_ax)
         task_traj_ax.view_init(90, 135)
+
+
+    # dfunc_group_plt = {}
+    # dfunc_group_sdms = {}
+    # dfunc_group_sdms['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+    #                             d.saccin_nonmatch_g_sdms,
+    #                             d.saccout_nonmatch_sdms)
+    # dfunc_group_plt['Rufus'] = (d.novin_saccin, d.novin_saccout,
+    #                             d.famin_saccin, d.famin_saccout)
+    # dfunc_group_sdms['Neville'] = (d.saccin_match_sdms_n,
+    #                                d.saccout_match_g_sdms_n,
+    #                                d.saccin_nonmatch_g_sdms_n,
+    #                                d.saccout_nonmatch_sdms_n)
+    # dfunc_group_plt['Neville'] = (d.novin_saccin_n, d.novin_saccout_n,
+    #                               d.famin_saccin_n, d.famin_saccout_n)
+
+    # glm_shape = ((0, 0), (0, 1), (1, 0), (1, 1))
+    # glm_labels_plt = ('fam', 'sacc')
+    # glm_labels_sdms = ('match', 'sacc')
+    
+    # if 'cd' not in data.keys():
+    #     glm_dat = {}
+    #     for m, mdata in exper_data.items():
+    #         out_plt = na.glm_fit_full(mdata[0], glm_shape, dfunc_group_plt[m],
+    #                                   mf, start_glm, end_glm, binsize_glm,
+    #                                   cond_labels=glm_labels_plt,
+    #                                   binstep=binstep_glm, perms=perms_glm,
+    #                                   min_trials=min_trials_glm,
+    #                                   zscore=zscore_glm,
+    #                                   causal_timing=causal_timing)
+    #         out_sdms = na.glm_fit_full(mdata[0], glm_shape, dfunc_group_sdms[m],
+    #                                    mf, start_glm, end_glm, binsize_glm,
+    #                                    cond_labels=glm_labels_sdms,
+    #                                    binstep=binstep_glm, perms=perms_glm,
+    #                                    min_trials=min_trials_glm,
+    #                                    zscore=zscore_glm,
+    #                                    causal_timing=causal_timing)
+    #         glm_dat[m] = (out_plt, out_sdms)
+    #     data['cd'] = glm_dat
+
+    # glm_subgroups = ((0, 1, 2, 3),
+    #                  (4, 5, 6, 7))
+    # labels = (('M', 'NM', 'IN', 'OUT'),
+    #           ('M-IN', 'M-OUT', 'NM-IN', 'NM-OUT'))
+    # if 'cd' in gen_panels:
+    #     neurs = data['cd']
+    #     for m, glm_dat in neurs.items():
+    #         d_plt, d_sdms = glm_dat
+    #         axs_gs = glm_axs[m]
+    #         axs = list(f.add_subplot(ax) for ax in axs_gs)
+    #         (coeffs_plt, ps_plt, _), xs = d_plt
+    #         t_ind = np.argmax(np.abs(t_glm - xs))
+    #         gpl.plot_glm_indiv_selectivity(coeffs_plt[:, t_ind],
+    #                                        ps_plt[:, t_ind],
+    #                                        group_term_labels=labels,
+    #                                        subgroups=glm_subgroups,
+    #                                        p_thr=p_thr, axs=axs[:2])
+    #         coeffs_sdms, ps_sdms, _ = d_sdms[0]
+    #         gpl.plot_glm_indiv_selectivity(coeffs_sdms[:, t_ind],
+    #                                        ps_sdms[:, t_ind],
+    #                                        group_term_labels=labels,
+    #                                        subgroups=glm_subgroups,
+    #                                        p_thr=p_thr, axs=axs[2:])
+
+    
+    # plt_r1 = gs[:30, 35:50]
+    # plt_r2 = gs[:30, 50:65]
+
+    # plt_n1 = gs[:30, 70:85]
+    # plt_n2 = gs[:30, 85:]
+
+    # sdms_r1 = gs[35:, 35:50]
+    # sdms_r2 = gs[35:, 50:65]
+
+    # sdms_n1 = gs[35:, 70:85]
+    # sdms_n2 = gs[35:, 85:]
+
+    # glm_axs = {'Neville':(plt_n1, plt_n2, sdms_n1, sdms_n2),
+    #            'Rufus':(plt_r1, plt_r2, sdms_r1, sdms_r2)}

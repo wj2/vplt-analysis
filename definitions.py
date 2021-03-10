@@ -28,6 +28,26 @@ ll_plt_r = 29
 hh_plt_r = 30
 hl_plt_r = 31
 
+fn_sdms1_n = 1 # fam sample, fam in rf
+fn_sdms2_n = 2 # fam sample, nov in rf
+ff_sdms1_n = 3
+ff_sdms2_n = 4
+nn_sdms1_n = 5
+nn_sdms2_n = 6
+nf_sdms1_n = 7 # nov sample, nov in rf
+nf_sdms2_n = 8 # nov sample, fam in rf
+
+fn_plt_n = 9
+ff_plt_n = 10
+nn_plt_n = 11
+nf_plt_n = 12
+
+lh_plt_n = 13
+ll_plt_n = 14
+hh_plt_n = 15
+hl_plt_n = 16
+
+
 plt_cond_dict = {'cond_ff':ff_plt_r, 'cond_nn':nn_plt_r, 'cond_fn':fn_plt_r, 
                  'cond_nf':nf_plt_r}
 plt_rw_f_cond_dict = {'cond_ff':ff_plt_r, 'cond_nn':rr_plt_r, 'cond_fn':fr_plt_r,
@@ -103,14 +123,30 @@ rufus_sdms_conds_norw = (fn_sdms1_r, fn_sdms2_r, ff_sdms1_r, ff_sdms2_r,
                          fr_sdms1_r, fr_sdms2_r)
 
 cgroups = {}
-cgroups['Rufus'] = {'left':(nf_sdms1_r, fn_sdms1_r,
-                                  ff_sdms1_r, nn_sdms1_r),
+cgroups['Rufus'] = {'all':(nf_sdms1_r, fn_sdms1_r,
+                           ff_sdms1_r, nn_sdms1_r,
+                           nf_sdms2_r, fn_sdms2_r,
+                           ff_sdms2_r, nn_sdms2_r),
+                    'left':(nf_sdms1_r, fn_sdms1_r,
+                            ff_sdms1_r, nn_sdms1_r),
                     'right':(nf_sdms2_r, fn_sdms2_r,
                                    ff_sdms2_r, nn_sdms2_r),
                     'familiar':(fn_sdms1_r, nf_sdms2_r,
                                       ff_sdms1_r, ff_sdms2_r),
                     'novel':(nf_sdms1_r, fn_sdms2_r,
                                    nn_sdms1_r, nn_sdms2_r)}
+cgroups['Neville'] = {'all':(nf_sdms1_n, fn_sdms1_n,
+                             ff_sdms1_n, nn_sdms1_n,
+                             nf_sdms2_n, fn_sdms2_n,
+                             ff_sdms2_n, nn_sdms2_n),
+                      'left':(nf_sdms1_n, fn_sdms1_n,
+                              ff_sdms1_n, nn_sdms1_n),
+                      'right':(nf_sdms2_n, fn_sdms2_n,
+                               ff_sdms2_n, nn_sdms2_n),
+                      'familiar':(fn_sdms1_n, nf_sdms2_n,
+                                  ff_sdms1_n, ff_sdms2_n),
+                      'novel':(nf_sdms1_n, fn_sdms2_n,
+                               nn_sdms1_n, nn_sdms2_n)}
 
 
 # Constraint functions
@@ -141,11 +177,13 @@ bhv_models = {'Rufus':rufus_bhv_model, 'Stan':stan_bhv_model,
               'Bootsy':bootsy_bhv_model}
 
 data_patterns = {'Stan':'data_.*\.mat', 'Bootsy':'data_.*\.mat',
-                 'Rufus':'.*_merged\.mat'}
+                 'Rufus':'.*_merged\.mat', 'Neville':'.*_merged\.mat'}
 reading_additional = {'Stan':dict(make_log_name=False, use_data_name=True),
                       'Bootsy':dict(make_log_name=False, use_data_name=True),
                       'Rufus':dict(make_log_name=False, dates=lip_dates,
-                                   forget_imglog=True)}
+                                   forget_imglog=True),
+                      'Neville':dict(make_log_name=False,
+                                     forget_imglog=True)}
 
 ## sdmst
 fam_targ_in = u.make_trial_constraint_func(('trial_type', 'TrialError'),
@@ -262,6 +300,92 @@ saccout_low_lum = u.make_trial_constraint_func(('trial_type', 'right_first',
                                              (np.isin, np.equal, np.equal,
                                               np.equal))
 
+saccin_high_lum_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((hl_plt_n, hh_plt_n), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccin_low_lum_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((lh_plt_n, ll_plt_n), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccout_high_lum_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((hl_plt_n, hh_plt_n), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccout_low_lum_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((lh_plt_n, ll_plt_n), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+
+saccin_high_lum_close = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((hl_plt_r, hh_plt_r), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccin_low_lum_close = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((lh_plt_r, ll_plt_r), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccout_high_lum_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((hl_plt_r, hh_plt_r), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccout_low_lum_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((lh_plt_r, ll_plt_r), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+
+saccin_high_lum_close_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((hl_plt_n, hh_plt_n), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccin_low_lum_close_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((lh_plt_n, ll_plt_n), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccout_high_lum_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((hl_plt_n, hh_plt_n), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+saccout_low_lum_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((lh_plt_n, ll_plt_n), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
 
 
 novin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
@@ -306,6 +430,135 @@ famout_saccout = u.make_trial_constraint_func(('trial_type', 'right_first',
                                                0),
                                               (np.isin, np.equal, np.equal,
                                                np.equal))
+novin_saccin_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((nf_plt_n, nn_plt_n), True, 180,
+                                             0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
+novin_saccout_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((nf_plt_n, nn_plt_n), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+famin_saccin_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_n, ff_plt_n), True, 180,
+                                             0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
+famin_saccout_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((fn_plt_n, ff_plt_n), True, 180,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+novout_saccout_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                               'angular_separation',
+                                               'TrialError'),
+                                              ((fn_plt_n, nn_plt_n), True, 180,
+                                               0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+famout_saccout_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                               'angular_separation',
+                                               'TrialError'),
+                                              ((nf_plt_n, ff_plt_n), True, 180,
+                                               0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+
+###
+
+novin_saccin_close = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((nf_plt_r, nn_plt_r), True, 45,
+                                             0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
+novin_saccout_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((nf_plt_r, nn_plt_r), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+famin_saccin_close = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_r, ff_plt_r), True, 45,
+                                             0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
+famin_saccout_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((fn_plt_r, ff_plt_r), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+novout_saccout_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                               'angular_separation',
+                                               'TrialError'),
+                                              ((fn_plt_r, nn_plt_r), True, 45,
+                                               0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+famout_saccout_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                               'angular_separation',
+                                               'TrialError'),
+                                              ((nf_plt_r, ff_plt_r), True, 45,
+                                               0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+novin_saccin_close_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((nf_plt_n, nn_plt_n), True, 45,
+                                             0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
+novin_saccout_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((nf_plt_n, nn_plt_n), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+famin_saccin_close_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_n, ff_plt_n), True, 45,
+                                             0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
+famin_saccout_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                             ((fn_plt_n, ff_plt_n), True, 45,
+                                              0),
+                                             (np.isin, np.equal, np.equal,
+                                              np.equal))
+novout_saccout_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                               'angular_separation',
+                                               'TrialError'),
+                                              ((fn_plt_n, nn_plt_n), True, 45,
+                                               0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+famout_saccout_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                               'angular_separation',
+                                               'TrialError'),
+                                              ((nf_plt_n, ff_plt_n), True, 45,
+                                               0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
 
 novin_lip = u.make_trial_constraint_func(('trial_type', 'left_first',
                                           'angular_separation',
@@ -343,6 +596,22 @@ saccout_lip = u.make_trial_constraint_func(('trial_type', 'right_first',
                                         True, 180, 0),
                                        (np.isin, np.equal, np.equal, np.equal))
 
+def sacc_seq(trl_seqs, seq):
+    n = len(seq)
+    mask = np.zeros(len(trl_seqs), dtype=bool)
+    for i, ts in enumerate(trl_seqs):
+        mask[i] = ts[:n] == seq
+    return mask        
+
+second_saccin_plt = u.make_trial_constraint_func(('trial_type', 'saccade_targ',
+                                       'angular_separation',
+                                       'TrialError'),
+                                      ((fn_plt_r, nn_plt_r, ff_plt_r,
+                                        nf_plt_r),
+                                       (b'r', b'l'), 180, 0),
+                                      (np.isin, sacc_seq, np.equal,
+                                       np.equal))
+
 saccin_plt = u.make_trial_constraint_func(('trial_type', 'left_first',
                                        'angular_separation',
                                        'TrialError'),
@@ -351,12 +620,61 @@ saccin_plt = u.make_trial_constraint_func(('trial_type', 'left_first',
                                        True, 180, 0),
                                       (np.isin, np.equal, np.equal,
                                        np.equal))
+saccin_plt_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_n, nn_plt_n, ff_plt_n,
+                                              nf_plt_n),
+                                             True, 180, 0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
 saccout_plt = u.make_trial_constraint_func(('trial_type', 'right_first',
                                             'angular_separation',
                                             'TrialError'),
                                            ((fn_plt_r, nn_plt_r, ff_plt_r,
                                              nf_plt_r),
                                             True, 180, 0),
+                                           (np.isin, np.equal, np.equal,
+                                            np.equal))
+saccout_plt_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                           ((fn_plt_n, nn_plt_n, ff_plt_n,
+                                             nf_plt_n),
+                                            True, 180, 0),
+                                           (np.isin, np.equal, np.equal,
+                                            np.equal))
+
+saccin_plt_close = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                       'angular_separation',
+                                       'TrialError'),
+                                      ((fn_plt_r, nn_plt_r, ff_plt_r,
+                                        nf_plt_r),
+                                       True, 45, 0),
+                                      (np.isin, np.equal, np.equal,
+                                       np.equal))
+saccin_plt_close_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_n, nn_plt_n, ff_plt_n,
+                                              nf_plt_n),
+                                             True, 45, 0),
+                                            (np.isin, np.equal, np.equal,
+                                             np.equal))
+saccout_plt_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                            'angular_separation',
+                                            'TrialError'),
+                                           ((fn_plt_r, nn_plt_r, ff_plt_r,
+                                             nf_plt_r),
+                                            True, 45, 0),
+                                           (np.isin, np.equal, np.equal,
+                                            np.equal))
+saccout_plt_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                              'angular_separation',
+                                              'TrialError'),
+                                           ((fn_plt_n, nn_plt_n, ff_plt_n,
+                                             nf_plt_n),
+                                            True, 45, 0),
                                            (np.isin, np.equal, np.equal,
                                             np.equal))
 
@@ -376,18 +694,122 @@ saccout_lum = u.make_trial_constraint_func(('trial_type', 'right_first',
                                             True, 180, 0),
                                            (np.isin, np.equal, np.equal,
                                             np.equal))
+saccin_lum_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                           'angular_separation',
+                                           'TrialError'),
+                                          ((lh_plt_n, hh_plt_n, ll_plt_n,
+                                            hl_plt_n),
+                                           True, 180, 0),
+                                          (np.isin, np.equal, np.equal,
+                                           np.equal))
+saccout_lum_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                            'angular_separation',
+                                            'TrialError'),
+                                           ((lh_plt_n, hh_plt_n, ll_plt_n,
+                                             hl_plt_n),
+                                            True, 180, 0),
+                                           (np.isin, np.equal, np.equal,
+                                            np.equal))
 
+saccin_lum_close = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                           'angular_separation',
+                                           'TrialError'),
+                                          ((lh_plt_r, hh_plt_r, ll_plt_r,
+                                            hl_plt_r),
+                                           True, 45, 0),
+                                          (np.isin, np.equal, np.equal,
+                                           np.equal))
+saccout_lum_close = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                            'angular_separation',
+                                            'TrialError'),
+                                           ((lh_plt_r, hh_plt_r, ll_plt_r,
+                                             hl_plt_r),
+                                            True, 45, 0),
+                                           (np.isin, np.equal, np.equal,
+                                            np.equal))
+saccin_lum_close_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                           'angular_separation',
+                                           'TrialError'),
+                                          ((lh_plt_n, hh_plt_n, ll_plt_n,
+                                            hl_plt_n),
+                                           True, 45, 0),
+                                          (np.isin, np.equal, np.equal,
+                                           np.equal))
+saccout_lum_close_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                            'angular_separation',
+                                            'TrialError'),
+                                           ((lh_plt_n, hh_plt_n, ll_plt_n,
+                                             hl_plt_n),
+                                            True, 45, 0),
+                                           (np.isin, np.equal, np.equal,
+                                            np.equal))
+
+
+
+# saccin_sdms = u.make_trial_constraint_func(('trial_type',
+#                                             'TrialError'),
+#                                            ((fn_sdms1_r, nn_sdms1_r,
+#                                              ff_sdms1_r,
+#                                              nf_sdms1_r), 0),
+#                                            (np.isin, np.equal))
+# saccin_sdms_n = u.make_trial_constraint_func(('trial_type',
+#                                             'TrialError'),
+#                                            ((fn_sdms1_n, nn_sdms1_n,
+#                                              ff_sdms1_n,
+#                                              nf_sdms1_n), 0),
+#                                            (np.isin, np.equal))
+# saccout_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+#                                             ((fn_sdms2_r, nn_sdms2_r,
+#                                               ff_sdms2_r, nf_sdms2_r), 0),
+#                                             (np.isin, np.equal))
+# saccout_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+#                                               ((fn_sdms2_n, nn_sdms2_n,
+#                                                 ff_sdms2_n, nf_sdms2_n), 0),
+#                                               (np.isin, np.equal))
 
 saccin_sdms = u.make_trial_constraint_func(('trial_type',
-                                            'TrialError'),
+                                            'left_first'),
                                            ((fn_sdms1_r, nn_sdms1_r,
                                              ff_sdms1_r,
+                                             nf_sdms1_r), True),
+                                           (np.isin, np.equal))
+saccin_sdms_n = u.make_trial_constraint_func(('trial_type',
+                                              'left_first'),
+                                           ((fn_sdms1_n, nn_sdms1_n,
+                                             ff_sdms1_n,
+                                             nf_sdms1_n), True),
+                                           (np.isin, np.equal))
+saccout_sdms = u.make_trial_constraint_func(('trial_type', 'right_first'),
+                                            ((fn_sdms2_r, nn_sdms2_r,
+                                              ff_sdms2_r, nf_sdms2_r), True),
+                                            (np.isin, np.equal))
+saccout_sdms_n = u.make_trial_constraint_func(('trial_type', 'right_first'),
+                                              ((fn_sdms2_n, nn_sdms2_n,
+                                                ff_sdms2_n, nf_sdms2_n), True),
+                                              (np.isin, np.equal))
+
+
+sample_nov_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+                                           ((fn_sdms2_r, nn_sdms1_r,
+                                             nn_sdms2_r,
                                              nf_sdms1_r), 0),
                                            (np.isin, np.equal))
-saccout_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
-                                            ((fn_sdms2_r, nn_sdms2_r,
+sample_nov_sdms_n = u.make_trial_constraint_func(('trial_type','TrialError'),
+                                           ((fn_sdms2_n, nn_sdms1_n,
+                                             nn_sdms2_n,
+                                             nf_sdms1_n), 0),
+                                           (np.isin, np.equal))
+sample_fam_sdms = u.make_trial_constraint_func(('trial_type','TrialError'),
+                                            ((fn_sdms1_r, ff_sdms1_r,
                                               ff_sdms2_r, nf_sdms2_r), 0),
                                             (np.isin, np.equal))
+sample_fam_sdms_n = u.make_trial_constraint_func(('trial_type','TrialError'),
+                                              ((fn_sdms1_n, ff_sdms1_n,
+                                                ff_sdms2_n, nf_sdms2_n),0),
+                                              (np.isin,np.equal))
+
+
+
 
 saccin_match_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
                                                  ((fn_sdms1_r, nn_sdms1_r,
@@ -399,6 +821,13 @@ saccin_nonmatch_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError',
                                                       ff_sdms2_r, nf_sdms2_r), 6,
                                                      True),
                                                     (np.isin, np.equal, np.equal))
+saccin_nonmatch_g_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                       'right_first'),
+                                                      ((fn_sdms2_r, nn_sdms2_r,
+                                                        ff_sdms2_r, nf_sdms2_r), 6,
+                                                       False),
+                                                      (np.isin, np.equal,
+                                                       np.equal))
 
 saccin_nov_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError',
                                                 'left_first'),
@@ -435,10 +864,81 @@ saccout_match_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError',
                                                     ff_sdms1_r, nf_sdms1_r), 6,
                                                    True),
                                                   (np.isin, np.equal, np.equal))
+saccout_match_g_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                     'left_first'),
+                                                    ((fn_sdms1_r, nn_sdms1_r,
+                                                      ff_sdms1_r, nf_sdms1_r), 6,
+                                                     False),
+                                                    (np.isin, np.equal, np.equal))
 saccout_nonmatch_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
                                                      ((fn_sdms2_r, nn_sdms2_r,
                                                        ff_sdms2_r, nf_sdms2_r), 0),
                                                      (np.isin, np.equal))
+
+
+saccin_match_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+                                                 ((fn_sdms1_n, nn_sdms1_n,
+                                                   ff_sdms1_n, nf_sdms1_n), 0),
+                                                 (np.isin, np.equal, np.equal))
+saccin_nonmatch_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                     'left_first'),
+                                                    ((fn_sdms2_n, nn_sdms2_n,
+                                                      ff_sdms2_n, nf_sdms2_n), 6,
+                                                     True),
+                                                    (np.isin, np.equal, np.equal))
+saccin_nonmatch_g_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                         'right_first'),
+                                                    ((fn_sdms2_n, nn_sdms2_n,
+                                                      ff_sdms2_n, nf_sdms2_n), 6,
+                                                     False),
+                                                    (np.isin, np.equal, np.equal))
+
+saccin_nov_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                'left_first'),
+                                               ((nn_sdms2_n, nf_sdms2_n,
+                                                 nn_sdms1_n, nf_sdms1_n),
+                                                (6, 0), True),
+                                               (np.isin, np.isin, np.equal))
+
+saccout_nov_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                 'right_first'),
+                                                ((nn_sdms2_n, nf_sdms2_n,
+                                                  nn_sdms1_n, nf_sdms1_n),
+                                                 (6, 0), True),
+                                                (np.isin, np.isin, np.equal))
+
+saccin_fam_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                 'left_first'),
+                                                ((ff_sdms2_n, fn_sdms2_n,
+                                                  ff_sdms1_n, fn_sdms1_n),
+                                                 (6, 0), True),
+                                                (np.isin, np.isin, np.equal))
+
+saccout_fam_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                 'right_first'),
+                                                ((ff_sdms2_n, fn_sdms2_n,
+                                                  ff_sdms1_n, fn_sdms1_n),
+                                                 (6, 0), True),
+                                                (np.isin, np.isin, np.equal))
+
+
+saccout_match_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                   'right_first'),
+                                                  ((fn_sdms1_n, nn_sdms1_n,
+                                                    ff_sdms1_n, nf_sdms1_n), 6,
+                                                   True),
+                                                  (np.isin, np.equal, np.equal))
+saccout_match_g_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError',
+                                                   'left_first'),
+                                                  ((fn_sdms1_n, nn_sdms1_n,
+                                                    ff_sdms1_n, nf_sdms1_n), 6,
+                                                   False),
+                                                      (np.isin, np.equal, np.equal))
+saccout_nonmatch_sdms_n = u.make_trial_constraint_func(('trial_type', 'TrialError'),
+                                                     ((fn_sdms2_n, nn_sdms2_n,
+                                                       ff_sdms2_n, nf_sdms2_n), 0),
+                                                     (np.isin, np.equal))
+
 
 rufus_sdms = u.make_trial_constraint_func(('trial_type', 'TrialError'),
                                           (rufus_sdms_conds_norw, 0),
@@ -558,15 +1058,25 @@ fix_off_func = u.make_time_field_func('fixation_off')
 fixation_acquired = u.make_time_field_func('fixation_acquired')
 fix_on_func = u.make_time_field_func('fixation_on')
 first_sacc_func = u.make_time_field_func('first_sacc_time')
+img_off_func_incorr = u.make_time_field_func('test_array_off')
+img_off_func_corr = u.make_time_field_func('test_array_off', offset=-400)
+
 
 # Parameter collections
 eye_params = {}
 eye_params['Rufus'] = {'skips':1, 'stdthr':None, 'filtwin':40, 'thr':.07,
                        'fixthr':10, 'vthr':None}
+eye_params['Neville'] = {'skips':1, 'stdthr':None, 'filtwin':40, 'thr':.07,
+                       'fixthr':10, 'vthr':None}
 eye_params['Bootsy'] = {'skips':1, 'stdthr':None, 'filtwin':40, 'thr':.07,
                         'fixthr':10, 'vthr':None}
 eye_params['Stan'] = {'skips':1, 'stdthr':None, 'filtwin':40, 'thr':.07,
                       'fixthr':10, 'vthr':None}
+
+neville_sdms_conds_norw = (fn_sdms1_n, fn_sdms2_n, ff_sdms1_n, ff_sdms2_n,
+                           nn_sdms1_n, nn_sdms2_n, nf_sdms1_n, nf_sdms2_n)
+neville_plt_conds_norw = (fn_plt_n, ff_plt_n, nn_plt_n, nf_plt_n)
+neville_lum_conds_norw = (hl_plt_n, ll_plt_n, hh_plt_n, lh_plt_n)
 
 reading_params = {}
 reading_params['Stan'] = {'plt_conds': stan_plt_conds_norw,
@@ -592,3 +1102,10 @@ reading_params['Rufus'] = {'plt_conds': rufus_plt_conds_norw,
                            'default_img1_xy': d1_xy_rufus, 
                            'default_img2_xy':d2_xy_rufus,
                            'eye_params':eye_params['Rufus']}
+reading_params['Neville'] = {'plt_conds': neville_plt_conds_norw,
+                             'sdms_conds': neville_sdms_conds_norw,
+                             'lum_conds':neville_lum_conds_norw,
+                             'noerr': False, 'ephys': True,
+                             'default_img1_xy': d1_xy_rufus, 
+                             'default_img2_xy':d2_xy_rufus,
+                             'eye_params':eye_params['Rufus']}
