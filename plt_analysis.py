@@ -1298,13 +1298,16 @@ def plot_dpca_kernels(dpca, xs, axs_keys, dim_dict=0, arr_labels=None,
             pval = 1 - np.sum(score > shuff_score, axis=0)/num_shuffs
         else:
             pval = np.ones_like(xs)
-        kern = kerns[k][dim]
+        # kern = kerns[k][dim]
+        kern = kerns[k][0]
+        kern2 = kerns[k][1]
         sig = pval < signif_level
         ax_shape = kern.shape[:-1]
         ind_combs = itertools.product(*(range(x) for x in ax_shape))
         
         for ic in ind_combs:
             k1 = kern[ic]
+            k2 = kern2[ic]
             if color_dict is not None:
                 color = color_dict[k]
             else:

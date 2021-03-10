@@ -1191,34 +1191,48 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                              min_spks=min_spks)
             dpca_outs[m] = out
         data['c'] = dpca_outs
-        
+
     signif_level = params.getfloat('signif_level_dpca')
     
     time_sdms_ax = f.add_subplot(time_sdms_grid)
-    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid, sharex=time_sdms_ax)
-    match_sdms_ax = f.add_subplot(match_sdms_grid, sharex=time_sdms_ax)
+    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid) # , sharex=time_sdms_ax)
+    match_sdms_ax = f.add_subplot(match_sdms_grid) # , sharex=time_sdms_ax)
     ax_keys = (('t', time_sdms_ax), ('st', sacc_sdms_ax), ('mt', match_sdms_ax))
-    color_dict = {'t':sdms_sc, 'st':sdms_sc, 'mt':sdms_mc}
+    color_dict = {'t':sdms_tc, 'st':sdms_sc, 'mt':sdms_mc}
     style_dict = {'t':np.array(((pro_s, pro_s), (anti_s, anti_s))),
-                  'st':np.array(((pro_s, pro_s), (anti_s, anti_s))),
-                  'mt':np.array(((pro_s, anti_s), (pro_s, anti_s)))}
+                  'st':np.array(((pro_s, anti_s), (pro_s, anti_s))),
+                  'mt':np.array(((pro_s, pro_s), (anti_s, anti_s)))}
+    dim_dict = {'t':0, 'st':1, 'mt':1}
+    signif_h_dict = {'t':0, 'st':-4.5, 'mt':-2}
     if 'c' in gen_panels:
         for m, dpca_out in data['c'].items():
-            org, dpcas, xs = dpca_out
-            pl.plot_dpca_kernels(dpcas[1], xs, ax_keys, dim=0,
-                                 signif_level=signif_level,
-                                 color_dict=color_dict, style_dict=style_dict)
+            if m == plot_monkey:
+                org, dpcas, xs = dpca_out
+                pl.plot_dpca_kernels(dpcas[0], xs, ax_keys, dim_dict=dim_dict,
+                                     signif_level=signif_level,
+                                     color_dict=color_dict, style_dict=style_dict,
+                                     signif_heights=signif_h_dict)
 
-        gpl.make_yaxis_scale_bar(time_sdms_ax, magnitude=20)
+        gpl.make_yaxis_scale_bar(time_sdms_ax, magnitude=40)
         gpl.make_yaxis_scale_bar(sacc_sdms_ax, label='normalized firing rate',
-                                 magnitude=10, text_buff=.19)
-        gpl.make_yaxis_scale_bar(match_sdms_ax, magnitude=5)
+                                 magnitude=4, text_buff=.19)
+        gpl.make_yaxis_scale_bar(match_sdms_ax, magnitude=2)
         gpl.make_xaxis_scale_bar(match_sdms_ax, magnitude=50, label='time (ms)')
         gpl.clean_plot_bottom(time_sdms_ax)
+        time_sdms_ax.set_title('sDMST', loc='left')
+        time_sdms_ax.text(0, .98, 'condition-independent',
+                          transform=time_sdms_ax.transAxes)
+        sacc_sdms_ax.text(0, .98, 'saccade-dependent',
+                          transform=sacc_sdms_ax.transAxes)
+        match_sdms_ax.text(0, .98, 'image-dependent',
+                          transform=match_sdms_ax.transAxes)
         gpl.clean_plot_bottom(sacc_sdms_ax)
+
     dfunc_group_plt = {}
     dfunc_group_plt['Rufus'] = (d.novin_saccin, d.novin_saccout,
                                 d.famin_saccin, d.famin_saccout)
+    dfunc_group_plt['Neville'] = (d.novin_saccin_n, d.novin_saccout_n,
+                                  d.famin_saccin_n, d.famin_saccout_n)
     dfunc_pts = ((0, 0), (0, 1), (1, 0), (1, 1))
     cond_labels_plt = ('fst')
     if 'd' not in data.keys() and ('d' in gen_panels or 'e' in gen_panels):
@@ -1235,68 +1249,138 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
             dpca_outs[m] = out
         data['d'] = dpca_outs
 
-    time_plt_ax = f.add_subplot(time_plt_grid, sharex=time_sdms_ax)
+    time_plt_ax = f.add_subplot(time_plt_grid, sharex=time_sdms_ax,
+                                sharey=time_sdms_ax)
     sacc_plt_ax = f.add_subplot(sacc_plt_grid, sharey=sacc_sdms_ax,
-                                sharex=time_plt_ax)
+                                sharex=sacc_sdms_ax)
     fam_plt_ax = f.add_subplot(fam_plt_grid, sharey=match_sdms_ax,
-                               sharex=time_plt_ax)
+                               sharex=match_sdms_ax)
     ax_keys = (('t', time_plt_ax), ('st', sacc_plt_ax), ('ft', fam_plt_ax))
-    color_dict = {'t':plt_sc, 'st':plt_sc, 'ft':plt_fc}
+    color_dict = {'t':plt_tc, 'st':plt_sc, 'ft':plt_fc}
     style_dict = {'t':np.array(((pro_s, pro_s), (anti_s, anti_s))),
-                  'st':np.array(((pro_s, pro_s), (anti_s, anti_s))),
-                  'ft':np.array(((pro_s, anti_s), (pro_s, anti_s)))}
+                  'st':np.array(((pro_s, anti_s), (pro_s, anti_s))),
+                  'ft':np.array(((pro_s, pro_s), (anti_s, anti_s)))}
+    dim_dict = {'t':0, 'st':1, 'ft':1}
+    signif_h_dict = {'t':0, 'st':-4.6, 'ft':-2}
     if 'd' in gen_panels:
         for m, dpca_out in data['d'].items():
-            org, dpcas, xs = dpca_out
-            pl.plot_dpca_kernels(dpcas[1], xs, ax_keys, dim=0,
-                                 signif_level=signif_level,
-                                 color_dict=color_dict, style_dict=style_dict)
-        gpl.make_xaxis_scale_bar(fam_plt_ax, magnitude=50, label='time (ms)')
+            if m == plot_monkey:
+                org, dpcas, xs = dpca_out
+                pl.plot_dpca_kernels(dpcas[0], xs, ax_keys, dim_dict=dim_dict,
+                                     signif_level=signif_level,
+                                     color_dict=color_dict, style_dict=style_dict,
+                                     signif_heights=signif_h_dict)
+        # gpl.make_xaxis_scale_bar(fam_plt_ax, magnitude=50, label='time (ms)')
         gpl.clean_plot_bottom(time_plt_ax)
+        time_plt_ax.set_title('PLT')
         gpl.clean_plot_bottom(sacc_plt_ax)
         gpl.clean_plot(time_plt_ax, 1)
         gpl.clean_plot(sacc_plt_ax, 1)
         gpl.clean_plot(fam_plt_ax, 1)
+        pro_sleg = lines.Line2D([], [], color=plt_tc, linestyle=pro_s,
+                             label='saccade in')
+        anti_sleg = lines.Line2D([], [], color=plt_tc, linestyle=anti_s,
+                              label='saccade out')
+        sacc_plt_ax.legend(handles=(pro_sleg, anti_sleg), frameon=False,
+                           loc='upper left')
+        pro_mleg = lines.Line2D([], [], color=plt_tc, linestyle=pro_s,
+                             label='nov/match in')
+        anti_mleg = lines.Line2D([], [], color=plt_tc, linestyle=anti_s,
+                              label='fam/nonmatch in')
+        fam_plt_ax.legend(handles=(pro_mleg, anti_mleg), frameon=False,
+                           loc='upper left')
 
+    offset = .05
     full_ev_ax = f.add_subplot(full_ev_grid)
-    sacc_latency_ax = f.add_subplot(sacc_latency_grid)
+    sacc_latency_ax = f.add_subplot(sacc_latency_grid, sharex=full_ev_ax)
     match_latency_ax = f.add_subplot(match_latency_grid, sharex=sacc_latency_ax)
+    sdms_cent = 0
+    plt_cent = .5
     if 'e' in gen_panels:
-        for m, dpca_out in data['c'].items():
+        p_temp = '{}: {:.2f} ms {} encoding latency, {}'
+        for i, (m, dpca_out) in enumerate(data['c'].items()):
             _, dpcas_sdms, xs = dpca_out
-            ev_sdms = pl.compute_dpca_ev(dpcas_sdms)
-            full_ev_ax.hist(ev_sdms, density=True, color=sdms_sc,
-                            histtype='step')
+            ev_sdms = pl.compute_dpca_ev(dpcas_sdms)*100
+            
+            print('{}: {:.2f}% variance explained, {}'.format(m, ev_sdms[0],
+                                                              'sDMST'))
+            x_val = [sdms_cent - offset + 2*offset*i]
+            gpl.plot_trace_werr(x_val, ev_sdms,
+                                points=True, color=monkey_colors[m], ax=full_ev_ax)
             sdms_sacc_lat = pl.compute_dpca_latencies(dpcas_sdms, xs, 'st')
-            sacc_latency_ax.hist(sdms_sacc_lat, density=True, color=sdms_sc,
-                                 histtype='step')
-            sacc_lat_mean = np.nanmean(sdms_sacc_lat)
-            sacc_latency_ax.plot([sacc_lat_mean], .05, 'o', color=sdms_sc)
+            if not np.all(np.isnan(sdms_sacc_lat)):
+                # sacc_latency_ax.hist(sdms_sacc_lat, density=True, color=sdms_sc,
+                #                      histtype='step')
+                # sacc_latency_ax.plot([sacc_lat_mean], .05, 'o', color=sdms_sc
+                sacc_lat_mean = np.nanmean(sdms_sacc_lat)
+                gpl.plot_trace_werr(x_val, sdms_sacc_lat, points=True,
+                                    ax=sacc_latency_ax,
+                                    color=monkey_colors[m])
+                
+                print(p_temp.format(m, sacc_lat_mean, 'sacc', 'sDMST'))
             sdms_match_lat = pl.compute_dpca_latencies(dpcas_sdms, xs, 'mt')
-            match_latency_ax.hist(sdms_match_lat, density=True, color=sdms_mc,
-                                  histtype='step')
-            match_lat_mean = np.nanmean(sdms_match_lat)
-            match_latency_ax.plot([match_lat_mean], .05, 'o', color=sdms_mc)
-        for m, dpca_out in data['d'].items():
+            if not np.all(np.isnan(sdms_match_lat)):
+                # match_latency_ax.hist(sdms_match_lat, density=True, color=sdms_mc,
+                # histtype='step')
+                # match_latency_ax.plot([match_lat_mean], .05, 'o', color=sdms_mc)
+                match_lat_mean = np.nanmean(sdms_match_lat)
+                gpl.plot_trace_werr(x_val, sdms_match_lat, points=True,
+                                    ax=match_latency_ax, color=monkey_colors[m])
+                print(p_temp.format(m, match_lat_mean, 'match', 'sDMST'))
+                
+        for i, (m, dpca_out) in enumerate(data['d'].items()):
             _, dpcas_plt, xs = dpca_out
-            ev_plt = pl.compute_dpca_ev(dpcas_plt)
-            full_ev_ax.hist(ev_plt, density=True, color=plt_sc, histtype='step')
+            ev_plt = pl.compute_dpca_ev(dpcas_plt)*100
+            print('{}: {:.2f}% variance explained, {}'.format(m, ev_plt[0]*100,
+                                                              'PLT'))
+            x_val = [plt_cent - offset + 2*offset*i]
+            gpl.plot_trace_werr(x_val, ev_plt, points=True,
+                                color=monkey_colors[m], ax=full_ev_ax)
+
             plt_sacc_lat = pl.compute_dpca_latencies(dpcas_plt, xs, 'st')
-            sacc_latency_ax.hist(plt_sacc_lat, density=True, color=plt_sc,
-                                 histtype='step')
-            sacc_lat_mean = np.nanmean(plt_sacc_lat)
-            sacc_latency_ax.plot([sacc_lat_mean], .05, 'o', color=plt_sc)
+            if not np.all(np.isnan(plt_sacc_lat)):
+                # sacc_latency_ax.hist(plt_sacc_lat, density=True, color=plt_sc,
+                #                      histtype='step')
+                # sacc_latency_ax.plot([sacc_lat_mean], .05, 'o', color=plt_sc)
+                gpl.plot_trace_werr(x_val, plt_sacc_lat, ax=sacc_latency_ax,
+                                    points=True, color=monkey_colors[m])
+                sacc_lat_mean = np.nanmean(plt_sacc_lat)
+                print(p_temp.format(m, sacc_lat_mean, 'sacc', 'PLT'))
             plt_fam_lat = pl.compute_dpca_latencies(dpcas_plt, xs, 'ft')
-            match_latency_ax.hist(plt_fam_lat, density=True, color=plt_fc,
-                                  histtype='step')
-            fam_lat_mean = np.nanmean(plt_fam_lat)
-            match_latency_ax.plot([fam_lat_mean], .05, 'o', color=plt_fc)
+            if not np.all(np.isnan(plt_fam_lat)):
+                # match_latency_ax.hist(plt_fam_lat, density=True, color=plt_fc,
+                #                       histtype='step')
+                # match_latency_ax.plot([fam_lat_mean], .05, 'o', color=plt_fc)
+                gpl.plot_trace_werr(x_val, plt_fam_lat, ax=match_latency_ax,
+                                    points=True, color=monkey_colors[m])
+                fam_lat_mean = np.nanmean(plt_fam_lat)
+                print(p_temp.format(m, fam_lat_mean, 'fam', 'PLT'))
         gpl.clean_plot(full_ev_ax, 0)
+        gpl.clean_plot_bottom(full_ev_ax, keeplabels=True)
+
+        full_ev_ax.set_xticks([sdms_cent, plt_cent])
+        full_ev_ax.set_xticklabels(['sDMST', 'PLT'], rotation=90)
+        full_ev_ax.set_xlim([-offset*4 + sdms_cent, plt_cent + offset*4])
+
+        
         gpl.clean_plot(sacc_latency_ax, 0)
         gpl.clean_plot(match_latency_ax, 0)
         gpl.clean_plot_bottom(sacc_latency_ax)
-        full_ev_ax.set_xlabel('explained variance')
-        match_latency_ax.set_xlabel('time (ms)')
+        gpl.clean_plot_bottom(match_latency_ax, keeplabels=True)
+        match_latency_ax.set_xticks([sdms_cent, plt_cent])
+        match_latency_ax.set_xticklabels(['sDMST', 'PLT'], rotation=90)
+        match_latency_ax.set_xlim([-offset*4 + sdms_cent, plt_cent + offset*4])        
+        
+        gpl.make_yaxis_scale_bar(full_ev_ax, anchor=0, magnitude=5,
+                                 label='percent explained\nvariance',
+                                 double=False, text_buff=1)
+
+        tb = .95
+        gpl.make_yaxis_scale_bar(sacc_latency_ax, anchor=0, magnitude=10,
+                                 label='latency (ms)', text_buff=tb)
+        gpl.make_yaxis_scale_bar(match_latency_ax, anchor=0, magnitude=50,
+                                 label='latency (ms)', double=False, text_buff=tb)
+
         
     bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig4-py.svg')
