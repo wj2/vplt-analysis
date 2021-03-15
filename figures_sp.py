@@ -29,7 +29,8 @@ def setup():
     gps.set_paper_style(colors)
     
 def figure1(data=None, gen_panels=None, exper_data=None,
-            monkey_paths=pl.monkey_paths, config_file=config_path):
+            monkey_paths=pl.monkey_paths, config_file=config_path,
+            bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -291,14 +292,15 @@ def figure1(data=None, gen_panels=None, exper_data=None,
         fix_ax.set_xlim([0, 500])
         gpl.make_yaxis_scale_bar(fix_ax, anchor=0, magnitude=.005, double=False)
 
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig1-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data    
 
 def figure2(data=None, gen_panels=None, exper_data=None,
             monkey_paths=pl.monkey_paths, config_file=config_path,
-            rand_eg=False):
+            rand_eg=False, bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -522,15 +524,15 @@ def figure2(data=None, gen_panels=None, exper_data=None,
         gpl.make_yaxis_scale_bar(diff_scatter_ax, anchor=0, magnitude=.1,
                                  double=False, label=y_lab,
                                  text_buff=.9)
-        
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig2-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
 def figure2a(data=None, gen_panels=None, exper_data=None,
              monkey_paths=pl.monkey_paths, config_file=config_path,
-             rand_eg=False):
+             rand_eg=False, bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -736,12 +738,11 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
                  (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
     glm_labels_both = ('task', 'priority', 'sacc')
 
-    time_cent = 50
-    time_wid = 100
-    av_only = True
-    adapt_delta = .99
-    max_fit = None
-    req_trials = 10
+    time_cent = params.getfloat('time_cent')
+    time_wid = params.getfloat('time_wid')
+    av_only = params.getboolean('av_only')
+    adapt_delta = params.getfloat('adapt_delta')
+    req_trials = params.getint('min_trials_lm')
     if 'cd' not in data.keys():
         glm_dat = {}
         for m, mdata in exper_data.items():
@@ -750,7 +751,7 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
                                          glm_labels_both, av_only=av_only,
                                          adapt_delta=adapt_delta,
                                          min_trials=req_trials,
-                                         max_fit=max_fit)
+                                         max_fit=None)
             glm_dat[m] = out_both
         data['cd'] = glm_dat
 
@@ -764,7 +765,7 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     return data    
 
 def figure3(data=None, gen_panels=None, exper_data=None,
-            monkey_paths=pl.monkey_paths, config_file=config_path):
+            monkey_paths=pl.monkey_paths, config_file=config_path, bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -1090,13 +1091,14 @@ def figure3(data=None, gen_panels=None, exper_data=None,
         match_scatter_ax.set_xlabel('match-nonmatch decoding')
         match_scatter_ax.set_ylabel('novel-familiar decoding')
         
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig3-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
 def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
-            monkey_paths=pl.monkey_paths, config_file=config_path):
+            monkey_paths=pl.monkey_paths, config_file=config_path, bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -1122,17 +1124,17 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
     pro_s = params.get('pro_style')
     anti_s = params.get('anti_style')
     
-    fsize = (5.5, 4.5)
+    fsize = (5, 4.5)
     f = plt.figure(figsize=fsize) # , constrained_layout=True)
     gs = f.add_gridspec(100, 100)
     
-    time_sdms_grid = gs[:32, :40]
-    sacc_sdms_grid = gs[34:65, :40]
-    match_sdms_grid = gs[67:, :40]
+    time_sdms_grid = gs[:30, :40]
+    sacc_sdms_grid = gs[35:63, :40]
+    match_sdms_grid = gs[68:, :40]
     
-    time_plt_grid = gs[:32, 40:80]
-    sacc_plt_grid = gs[34:65, 40:80]
-    fam_plt_grid = gs[67:, 40:80]
+    time_plt_grid = gs[:30, 40:80]
+    sacc_plt_grid = gs[35:63, 40:80]
+    fam_plt_grid = gs[68:, 40:80]
     
     full_ev_grid = gs[:24, 92:]
     sacc_latency_grid = gs[40:64, 92:]
@@ -1195,8 +1197,8 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
     signif_level = params.getfloat('signif_level_dpca')
     
     time_sdms_ax = f.add_subplot(time_sdms_grid)
-    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid) # , sharex=time_sdms_ax)
-    match_sdms_ax = f.add_subplot(match_sdms_grid) # , sharex=time_sdms_ax)
+    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid)
+    match_sdms_ax = f.add_subplot(match_sdms_grid)
     ax_keys = (('t', time_sdms_ax), ('st', sacc_sdms_ax), ('mt', match_sdms_ax))
     color_dict = {'t':sdms_tc, 'st':sdms_sc, 'mt':sdms_mc}
     style_dict = {'t':np.array(((pro_s, pro_s), (anti_s, anti_s))),
@@ -1217,7 +1219,15 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
         gpl.make_yaxis_scale_bar(sacc_sdms_ax, label='normalized firing rate',
                                  magnitude=4, text_buff=.19)
         gpl.make_yaxis_scale_bar(match_sdms_ax, magnitude=2)
-        gpl.make_xaxis_scale_bar(match_sdms_ax, magnitude=50, label='time (ms)')
+
+        time_xscale = 20
+        sacc_xscale = 10
+        match_xscale = 5
+        gpl.make_xaxis_scale_bar(time_sdms_ax, magnitude=time_xscale, label='')
+        gpl.make_xaxis_scale_bar(sacc_sdms_ax, magnitude=sacc_xscale, label='')
+        gpl.make_xaxis_scale_bar(match_sdms_ax, magnitude=match_xscale,
+                                 label='normalized firing rate')
+
         gpl.clean_plot_bottom(time_sdms_ax)
         time_sdms_ax.set_title('sDMST', loc='left')
         time_sdms_ax.text(0, .98, 'condition-independent',
@@ -1270,7 +1280,13 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                      signif_level=signif_level,
                                      color_dict=color_dict, style_dict=style_dict,
                                      signif_heights=signif_h_dict)
-        # gpl.make_xaxis_scale_bar(fam_plt_ax, magnitude=50, label='time (ms)')
+        gpl.make_xaxis_scale_bar(time_plt_ax, magnitude=time_xscale,
+                                 label='')
+        gpl.make_xaxis_scale_bar(sacc_plt_ax, magnitude=sacc_xscale,
+                                 label='')
+        gpl.make_xaxis_scale_bar(fam_plt_ax, magnitude=match_xscale,
+                                 label='normalized firing rate')
+
         gpl.clean_plot_bottom(time_plt_ax)
         time_plt_ax.set_title('PLT')
         gpl.clean_plot_bottom(sacc_plt_ax)
@@ -1382,13 +1398,14 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                  label='latency (ms)', double=False, text_buff=tb)
 
         
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig4-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
 def figure5(data=None, gen_panels=None, exper_data=None,
-            monkey_paths=pl.monkey_paths, config_file=config_path):
+            monkey_paths=pl.monkey_paths, config_file=config_path, bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -1577,13 +1594,14 @@ def figure5(data=None, gen_panels=None, exper_data=None,
         scatter_ax.set_xlabel('lumPLT activity (spikes/s)')
         scatter_ax.set_ylabel('sDMST activity (spikes/s)')
         
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig5-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
 def figure6(data=None, gen_panels=None, exper_data=None,
-            monkey_paths=pl.monkey_paths, config_file=config_path):
+            monkey_paths=pl.monkey_paths, config_file=config_path, bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -1798,13 +1816,15 @@ def figure6(data=None, gen_panels=None, exper_data=None,
         lum_sal_scatter_ax.set_xlabel('sDMST decoding')
         lum_sal_scatter_ax.set_ylabel('lumPLT decoding')
         
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig6-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
 def figure_si_bhv(data=None, gen_panels=None, exper_data=None,
-                  monkey_paths=pl.monkey_paths, config_file=config_path):
+                  monkey_paths=pl.monkey_paths, config_file=config_path,
+                  bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -1932,13 +1952,15 @@ def figure_si_bhv(data=None, gen_panels=None, exper_data=None,
         gpl.clean_plot(fs_lt_scatter_ax, 0)
         gpl.clean_plot(fs_sal_scatter_ax, 0)
 
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'si-bhv-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
 def figure_si_sal(data=None, gen_panels=None, exper_data=None,
-                  monkey_paths=pl.monkey_paths, config_file=config_path):
+                  monkey_paths=pl.monkey_paths, config_file=config_path,
+                  bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -2041,13 +2063,15 @@ def figure_si_sal(data=None, gen_panels=None, exper_data=None,
         gpl.clean_plot(time_sal_scatter_ax, 0)
         gpl.clean_plot(fs_sal_scatter_ax, 0)
 
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'si-sal-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data
 
 def figure_si_spatial(data=None, gen_panels=None, exper_data=None,
-                      monkey_paths=pl.monkey_paths, config_file=config_path):
+                      monkey_paths=pl.monkey_paths, config_file=config_path,
+                      bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -2315,7 +2339,8 @@ def figure_si_spatial(data=None, gen_panels=None, exper_data=None,
         gpl.clean_plot(lum_sal_ax, 1)
         gpl.clean_plot_bottom(lum_sal_pt_ax)
 
-    bf = params.get('basefolder')
+    if bf is None:
+        bf = params.get('basefolder')
     fname = os.path.join(bf, 'si-spatial-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
     return data

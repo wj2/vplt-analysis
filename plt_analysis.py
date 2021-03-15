@@ -279,6 +279,8 @@ def fit_stan_model(data, conds, labels, model_path, only_labels=None,
     task_var = conds[:, sdmst_ind]
     mask = _get_label_filter(labels, only_labels)
     conds = conds[..., mask]
+    if conds.shape[1] == 0:
+        conds = np.zeros((len(data), 1))
     sm = pickle.load(open(model_path, 'rb'))
     stan_data = dict(N=data.shape[0], K=conds.shape[1], x=conds,
                      y=data, beta_var=beta_var, sigma_var=sigma_var,
@@ -296,6 +298,10 @@ def fit_comparison_models(data, conds, labels, model_path=None,
         model_path = na.stan_file_glm_nomean
     if model_path_modu is None:
         model_path_modu = na.stan_file_glm_modu_nomean
+
+    out_null = fit_stan_model(data, conds, labels, model_path, only_labels=(),
+                              **fit_params)
+    
     pure_conds = list(filter(lambda x: len(x) == 1 and x[0][0] != 'task',
                              labels))
     out_pure = fit_stan_model(data, conds, labels, model_path,
@@ -314,9 +320,10 @@ def fit_comparison_models(data, conds, labels, model_path=None,
     out_third = fit_stan_model(data, conds, labels, model_path, **fit_params)
 
     models = {'pure':out_pure, 'modulated':out_mod, 'second':out_sec,
-              'third':out_third}
+              'third':out_third, 'null':out_null}
     models_ar = {'pure':out_pure[2], 'modulated':out_mod[2],
-                 'second':out_sec[2], 'third':out_third[2]}
+                 'second':out_sec[2], 'third':out_third[2],
+                 'null':out_null[2]}
     return models, models_ar
 
 def compare_models(data, tc, tw, marker_func, constr_funcs, constr_inds, labels,
@@ -365,6 +372,51 @@ def summarize_model_comparison(
         w_b = u.bootstrap_list(np.array(out_weight[mn]), np.mean, n=n_boots)
         out_weightsums[mn] = w_b
     return out_loss, out_weight, out_weightsums
+
+def plot_model_comparison(loss, weight, weightsums, axs=None,
+                          keys=('pure', 'modulated', 'second', 'third'),
+                          fwid=1.5, n_boots=1000, eps=.001):
+    if axs is None:
+        f = plt.figure(figsize=(fwid, 2*fwid))
+        ax_l = f.add_subplot(2, 1, 1)
+        ax_ws = f.add_subplot(2, 1, 2)
+    ax_vals = []
+    ax_labels = []
+    cols = []
+    vp_seq = []
+    for i, k in enumerate(keys[::-1]):
+        frac_b = u.bootstrap_list(np.array(loss[k]), lambda x: np.mean(x < 1),
+                                  n=n_boots)
+        l = gpl.plot_horiz_conf_interval(i, frac_b, ax_l)
+        col = l[0].get_color()
+        cols.append(col)
+        vp_seq.append(weight[k])
+        ax_vals.append(i)
+        ax_labels.append(k)
+    print(np.sum(np.logical_or(np.array(loss['second']) < eps,
+                               np.array(loss['third']) < eps)))
+    subset = np.logical_and(np.logical_or(np.array(loss['second']) < eps,
+                                          np.array(loss['third']) < eps),
+                            np.array(loss['modulated']) > 1)
+    print('{} / {}'.format(np.sum(subset), len(subset)))
+    vps = gpl.violinplot(vp_seq, positions=ax_vals, vert=False, ax=ax_ws,
+                         showextrema=False, showmedians=True)
+    ax_l.set_yticks(ax_vals)
+    ax_l.set_yticklabels(ax_labels)
+    ax_ws.set_yticks(ax_vals)
+    ax_ws.set_yticklabels(ax_labels)
+
+    ax_l.set_xlim([0, .9])
+    gpl.clean_plot_bottom(ax_l)
+    gpl.clean_plot(ax_l, 1, ticks=False)
+    gpl.make_xaxis_scale_bar(ax_l, magnitude=.5, double=False,
+                             label='fraction of neurons\nbest fit',
+                             text_buff=.23)
+    
+    gpl.clean_plot(ax_ws, 1, horiz=True, ticks=False)
+    gpl.make_xaxis_scale_bar(ax_ws, magnitude=.5, double=False,
+                             label='relative probability', text_buff=.23)
+    # gpl.clean_plot_bottom(ax_ws)
         
 def get_first_saccade_prob_bs(data, *args, n_boots=1000, remove_errs=True,
                               errfield='TrialError', angular_separation=180,
