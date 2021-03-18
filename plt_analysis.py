@@ -329,15 +329,17 @@ def fit_comparison_models(data, conds, labels, model_path=None,
 
     out_third = fit_stan_model(data, conds, labels, model_path, **fit_params)
 
-    models = {'pure':out_pure, 'modulated':out_mod, 'second':out_sec,
-              'third':out_third, 'null':out_null}
+    models = {'pure':out_pure[:2], 'modulated':out_mod[:2],
+              'second':out_sec[:2], 'third':out_third[:2],
+              'null':out_null[:2]}
     models_ar = {'pure':out_pure[2], 'modulated':out_mod[2],
                  'second':out_sec[2], 'third':out_third[2],
                  'null':out_null[2]}
     return models, models_ar
 
 def compare_models(data, tc, tw, marker_func, constr_funcs, constr_inds, labels,
-                   av_only=False, max_fit=None, min_trials=5, **fit_params):
+                   av_only=False, store_comp=True, max_fit=None, min_trials=5,
+                   **fit_params):
     out = format_data_stan_models(data, tc, tw, marker_func, constr_funcs,
                                   constr_inds, labels, min_trials=min_trials)
     glm_dat, glm_cond, glm_lab, xs = out
@@ -348,10 +350,11 @@ def compare_models(data, tc, tw, marker_func, constr_funcs, constr_inds, labels,
         print('{} / {}'.format(i+1, n_neurs))
         fit, comp = fit_comparison_models(gd, glm_cond[i], glm_lab, **fit_params)
         if not av_only:
-            comp_all.append(comp)
             fits_all.append(fit)
-        else:
+        if store_comp:
             comp_all.append(az.compare(comp))
+        else:
+            comp_all.append(comp)
         if max_fit is not None and i + 1 > max_fit:
             break
     return fits_all, comp_all
