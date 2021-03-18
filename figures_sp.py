@@ -308,7 +308,7 @@ def figure2(data=None, gen_panels=None, exper_data=None,
     if exper_data is None:
         exper_data = load_all_data(monkey_paths)
     if gen_panels is None:
-        gen_panels = ('a', 'b', 'c', 'd', 'e')
+        gen_panels = ('a', 'b', 'cd', 'e', 'f')
     if data is None:
         data = {}
 
@@ -316,260 +316,18 @@ def figure2(data=None, gen_panels=None, exper_data=None,
     f = plt.figure(figsize=fsize)
     gs = f.add_gridspec(100, 100)
 
-    eg1_grid = gs[:27, :60]
-    eg2_grid = gs[32:60, :60]
+    eg1_sacc_grid = gs[:23, :60]
+    eg2_sacc_grid = gs[27:48, :60]
 
-    presacc_scatter_grid = gs[70:, :35]
-    sacc_scatter_grid = gs[70:, 40:75]
-    diff_scatter_grid = gs[70:, 90:]
+    eg1_prior_grid = gs[52:73, :60]
+    eg2_prior_grid = gs[77:, :60]
 
-    vel_scatter_grid = gs[10:50, 72:]
+    presacc_scatter_grid = gs[30:47, 70:]
+    sacc_scatter_grid = gs[55:72, 70:]
+    diff_scatter_grid = gs[80:, 78:92]
 
-    # colors
-    sdms_sc = params.getcolor('sdms_sacc_color')
-    plt_sc = params.getcolor('plt_sacc_color')
-    comp_c = params.getcolor('comparison_color')
-    r_color = params.getcolor('rufus_color')
-    n_color = params.getcolor('neville_color')
-    monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+    vel_scatter_grid = gs[:16, 76:94]
 
-    # fig 2 timing params
-    start = params.getint('start')
-    end = params.getint('end')
-    binsize = params.getint('binsize')
-    binstep = params.getint('binstep')
-    
-    min_trials = params.getint('min_trials')
-    min_spks = params.getint('min_spks')
-    zscore = params.getboolean('zscore')
-    causal_timing = params.getboolean('causal_timing')
-
-    mf = d.first_sacc_func
-
-    # fig 2 trial selection params
-    dfunc_group = {}
-    dfunc_group['Rufus'] = (d.saccin_plt, d.saccout_plt,
-                            d.saccin_sdms, d.saccout_sdms)
-    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccout_plt_n,
-                              d.saccin_sdms_n, d.saccout_sdms_n)
-
-    if 'a' not in data.keys():
-        neurs = {}
-        for m, mdata in exper_data.items():
-            mfs = (mf,)*len(dfunc_group[m])
-            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
-                                           end, binsize, binstep=binstep, 
-                                           min_trials=min_trials, zscore=zscore,
-                                           causal_timing=causal_timing,
-                                           bhv_extract_func=pl.get_sacc_vel)
-            neurs[m] = out
-        data['a'] = neurs
-    else:
-        neurs = data['a']    
-        
-    scatter_pt = params.getint('check_pt')
-    eg1_info = ('Rufus', (15, 'CLUSTER9'))
-    key_r = list(neurs['Rufus'][0][0])
-    key_n = list(neurs['Neville'][0][0])
-    
-    if rand_eg:
-        eg1_ind = int(np.random.choice(len(key_r), 1))
-        eg2_ind = int(np.random.choice(len(key_n), 1))
-    else:
-        eg1_ind = 1
-        eg2_ind = 221        
-
-    eg1_info = ('Rufus', key_r[eg1_ind])
-    eg2_info = ('Neville', key_n[eg2_ind])
-
-    eg1_ax = f.add_subplot(eg1_grid)
-    eg2_ax = f.add_subplot(eg2_grid, sharex=eg1_ax, sharey=eg1_ax)
-    if 'a' in gen_panels:
-        m1, eg1_key = eg1_info
-        m2, eg2_key = eg2_info
-        ls = ('solid', 'dashed', 'solid', 'dashed')
-        labels_1 = ('PLT', '', 'sDMST', '')
-        labels_2 = ('', '', '', '')
-        colors = (plt_sc, plt_sc, sdms_sc, sdms_sc)
-        pl.plot_single_unit_eg(neurs[m1][0], neurs[m1][1], eg1_key,
-                               labels=labels_1, linestyles=ls,
-                               ax=eg1_ax, colors=colors)
-        pl.plot_single_unit_eg(neurs[m2][0], neurs[m2][1], eg2_key,
-                               labels=labels_2, ax=eg2_ax, linestyles=ls,
-                               colors=colors)
-        gpl.make_xaxis_scale_bar(eg2_ax, magnitude=50, label='time (ms)')
-        gpl.make_yaxis_scale_bar(eg2_ax, magnitude=35, anchor=5, double=False,
-                                 label='spikes/s')
-        gpl.make_yaxis_scale_bar(eg1_ax, magnitude=35, anchor=5, double=False,
-                                 label='spikes/s')
-        gpl.clean_plot_bottom(eg1_ax)
-
-    dfunc_group = {}
-    dfunc_group['Rufus'] = (d.saccin_plt, d.saccin_sdms)
-    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccin_sdms_n)
-
-    if 'bc' not in data.keys():
-        neurs = {}
-        for m, mdata in exper_data.items():
-            mfs = (mf,)*len(dfunc_group[m])
-            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
-                                           end, binsize, binstep=binstep, 
-                                           min_trials=min_trials, zscore=zscore,
-                                           causal_timing=causal_timing,
-                                           bhv_extract_func=pl.get_sacc_vel)
-            neurs[m] = out
-        data['bc'] = neurs
-    else:
-        neurs = data['bc']    
-        
-    vel_scatter_ax = f.add_subplot(vel_scatter_grid)
-    if 'b' in gen_panels:
-        neurs = data['bc']
-        for m, (neur, xs, bhv) in neurs.items():
-            vcorr = pl.compute_velocity_firing_correlation(neur, xs, bhv,
-                                                           scatter_pt)
-            vcorr_pairs = np.array(list((v, vcorr[1][k])
-                                        for k, v in vcorr[0].items()))
-            gpl.print_mean_conf95(vcorr_pairs[:, 0], m, 'sDMST vcorr')
-            gpl.print_mean_conf95(vcorr_pairs[:, 1], m, 'PLT vcorr')
-            vel_scatter_ax.plot(vcorr_pairs[:, 0], vcorr_pairs[:, 1], 'o',
-                                color=monkey_colors[m])
-        gpl.clean_plot(vel_scatter_ax, 0)
-        gpl.make_yaxis_scale_bar(vel_scatter_ax, magnitude=.2, anchor=0,
-                                 label='PLT velocity\ncorrelation', text_buff=.25)
-        gpl.make_xaxis_scale_bar(vel_scatter_ax, magnitude=.2, anchor=0,
-                                 label='sDMST velocity\ncorrelation')
-            
-        
-    boots = params.getint('boots')
-    lims = None
-    scatter_pt = params.getint('check_pt')
-    scatter_ax = f.add_subplot(sacc_scatter_grid)
-    if 'c' in gen_panels:
-        for m, neur in neurs.items():
-            print('{}: {} neurons, task'.format(m, len(neur[0][0])))
-            pl.plot_neuron_scatters(neur[:2], scatter_pt, lims=lims, boots=boots,
-                                    ax=scatter_ax, color=monkey_colors[m])
-        scatter_ax.set_xlabel('PLT activity (spikes/s)')
-
-    mf = d.fixation_acquired
-    if 'd' not in data.keys() and 'd' in gen_panels:
-        neurs = {}
-        for m, mdata in exper_data.items():
-            mfs = (mf,)*len(dfunc_group[m])
-            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
-                                           end, binsize, binstep=binstep, 
-                                           min_trials=min_trials, zscore=zscore,
-                                           causal_timing=causal_timing)
-            neurs[m] = out
-        data['d'] = neurs
-    
-    scatter_pt = 0
-    pre_scatter_ax = f.add_subplot(presacc_scatter_grid, sharex=scatter_ax,
-                                   sharey=scatter_ax)
-    if 'd' in gen_panels:
-        neurs = data['d']
-        for m, neur in neurs.items():
-            print('{}: {} neurons, pre'.format(m, len(neur[0][1])))
-            pl.plot_neuron_scatters(neur[:2], scatter_pt, lims=lims, boots=boots,
-                                    ax=pre_scatter_ax, color=monkey_colors[m])
-        pre_scatter_ax.set_ylabel('sDMST activity\n(spikes/s)')
-
-    mf1 = d.fixation_acquired
-    mf2 = d.first_sacc_func
-    diff_zscore = params.getboolean('diff_scatter_zscore')
-    if 'e' not in data.keys() and 'e' in gen_panels:
-        data['e'] = {}
-        for m, mdata in exper_data.items():
-            mfs1 = (mf1,)*len(dfunc_group[m])
-            out1 = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs1, start,
-                                           end, binsize, binstep=binstep, 
-                                           min_trials=min_trials, zscore=diff_zscore,
-                                           causal_timing=causal_timing)
-            diffs1 = pl.compute_average_diff(out1[0], out1[1], scatter_pt)
-            mfs2 = (mf2,)*len(dfunc_group[m])
-            out2 = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs2, start,
-                                           end, binsize, binstep=binstep, 
-                                           min_trials=min_trials, zscore=diff_zscore,
-                                           causal_timing=causal_timing)
-            diffs2 = pl.compute_average_diff(out2[0], out2[1], scatter_pt)
-            data['e'][m] = diffs1, diffs2
-        
-    scatter_pt = 0
-    diff_scatter_ax = f.add_subplot(diff_scatter_grid)
-    if 'e' in gen_panels:
-        for i, (m, neur) in enumerate(neurs.items()):
-            diffs1, diffs2 = data['e'][m]
-            offset = (i - len(neurs)/2)/5
-            pre_diffs = np.array(list(diffs1.values()))
-            task_diffs = np.array(list(diffs2.values()))
-            n_greater_pre = np.sum(pre_diffs > 0)
-            n_greater_task = np.sum(task_diffs > 0)
-            s_temp = '{}: {} neurons fire more in sDMST, {}'
-            print(s_temp.format(m, n_greater_pre, 'pre'))
-            print(s_temp.format(m, n_greater_task, 'task'))
-            out = pl.plot_neuron_diffs(diffs1, diffs2, boots=boots,
-                                       ax=diff_scatter_ax,
-                                       color=monkey_colors[m], offset=offset)
-            d1_boots, d2_boots = out
-            gpl.print_mean_conf95(d1_boots, m, 'z-scored diff, pre',
-                                  preboot=True)
-            gpl.print_mean_conf95(d2_boots, m, 'z-scored diff, task',
-                                  preboot=True)
-            
-        gpl.clean_plot_bottom(diff_scatter_ax, keeplabels=True)
-        diff_scatter_ax.set_xticks([0, 1])
-        diff_scatter_ax.set_xticklabels(['pre', 'img'], rotation=90)
-        y_lab = 'sDMST - PLT\n(z-scored)'
-        gpl.make_yaxis_scale_bar(diff_scatter_ax, anchor=0, magnitude=.1,
-                                 double=False, label=y_lab,
-                                 text_buff=.9)
-    if bf is None:
-        bf = params.get('basefolder')
-    fname = os.path.join(bf, 'fig2-py.svg')
-    f.savefig(fname, bbox_inches='tight', transparent=True)
-    return data
-
-def figure2a(data=None, gen_panels=None, exper_data=None,
-             monkey_paths=pl.monkey_paths, config_file=config_path,
-             rand_eg=False, bf=None):
-    setup()
-    cf = u.ConfigParserColor()
-    cf.read(config_file)
-    params = cf['figure2a']
-    if exper_data is None:
-        exper_data = load_all_data(monkey_paths)
-    if gen_panels is None:
-        gen_panels = ('a', 'b', 'cd', 'e')
-    if data is None:
-        data = {}
-
-    fsize = (5, 4.25)
-    f = plt.figure(figsize=fsize)
-    gs = f.add_gridspec(100, 100)
-
-    eg1_sacc_grid = gs[:23, :30]
-    eg2_sacc_grid = gs[27:48, :30]
-
-    eg1_prior_grid = gs[52:73, :30]
-    eg2_prior_grid = gs[77:, :30]
-
-    o1_m1 = gs[:35, 35:50]
-    o1_m2 = gs[35:70, 35:50]
-    o1_mb = gs[80:, 35:50]
-
-    o2_m1 = gs[:35, 50:80]
-    o2_m2 = gs[35:70, 50:80]
-    o2_mb = gs[80:, 50:80]
-    
-    o3_m1 = gs[:35, 80:]
-    o3_m2 = gs[35:70, 80:]
-    o3_mb = gs[80:, 80:]
-
-    glm_axs = {'Neville':(o1_m1, o2_m1, o3_m1),
-               'Rufus':(o1_m2, o2_m2, o3_m2)}
-    glm_mag_axs = (o1_mb, o2_mb, o3_mb)
-    
     # colors
     sdms_sc = params.getcolor('sdms_sacc_color')
     plt_sc = params.getcolor('plt_sacc_color')
@@ -629,8 +387,8 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     eg1_info = ('Rufus', key_r[eg1_ind])
     eg2_info = ('Neville', key_n[eg2_ind])
 
-    eg1_s_ax = f.add_subplot(eg1_sacc_grid)
-    eg2_s_ax = f.add_subplot(eg2_sacc_grid, sharex=eg1_s_ax, sharey=eg1_s_ax)
+    eg1_ax = f.add_subplot(eg1_sacc_grid)
+    eg2_ax = f.add_subplot(eg2_sacc_grid, sharex=eg1_ax, sharey=eg1_ax)
     if 'a' in gen_panels:
         m1, eg1_key = eg1_info
         m2, eg2_key = eg2_info
@@ -640,19 +398,19 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
         colors = (plt_sc, plt_sc, sdms_sc, sdms_sc)
         pl.plot_single_unit_eg(neurs[m1][0], neurs[m1][1], eg1_key,
                                labels=labels_1, linestyles=ls,
-                               ax=eg1_s_ax, colors=colors)
+                               ax=eg1_ax, colors=colors)
         pl.plot_single_unit_eg(neurs[m2][0], neurs[m2][1], eg2_key,
-                               labels=labels_2, ax=eg2_s_ax, linestyles=ls,
+                               labels=labels_2, ax=eg2_ax, linestyles=ls,
                                colors=colors)
-        gpl.make_xaxis_scale_bar(eg2_s_ax, magnitude=50, label='time (ms)')
-        gpl.make_yaxis_scale_bar(eg2_s_ax, magnitude=35, anchor=5, double=False,
+        # gpl.make_xaxis_scale_bar(eg2_ax, magnitude=50, label='time (ms)')
+        gpl.make_yaxis_scale_bar(eg2_ax, magnitude=35, anchor=5, double=False,
                                  label='spikes/s')
-        gpl.make_yaxis_scale_bar(eg1_s_ax, magnitude=35, anchor=5, double=False,
+        gpl.make_yaxis_scale_bar(eg1_ax, magnitude=35, anchor=5, double=False,
                                  label='spikes/s')
-        gpl.clean_plot_bottom(eg1_s_ax)
-    
-    # fig 2a trial selection params
-    dfunc_group = {}
+        gpl.clean_plot_bottom(eg1_ax)
+        gpl.clean_plot_bottom(eg2_ax)
+
+        dfunc_group = {}
     dfunc_group['Rufus'] = (d.novin_saccin, d.famin_saccin,
                             d.saccin_match_sdms, d.saccin_nonmatch_sdms)
     dfunc_group['Neville'] = (d.novin_saccin_n, d.famin_saccin_n,
@@ -689,7 +447,7 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     eg1_info = ('Rufus', key_r[eg1_ind])
     eg2_info = ('Neville', key_n[eg2_ind])
 
-    eg1_p_ax = f.add_subplot(eg1_prior_grid)
+    eg1_p_ax = f.add_subplot(eg1_prior_grid, sharex=eg1_ax)
     eg2_p_ax = f.add_subplot(eg2_prior_grid, sharex=eg1_p_ax, sharey=eg1_p_ax)
     if 'b' in gen_panels:
         m1, eg1_key = eg1_info
@@ -710,6 +468,174 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
         gpl.make_yaxis_scale_bar(eg1_p_ax, magnitude=25, anchor=5, double=False,
                                  label='spikes/s')
         gpl.clean_plot_bottom(eg1_p_ax)
+
+
+    dfunc_group = {}
+    dfunc_group['Rufus'] = (d.saccin_plt, d.saccin_sdms)
+    dfunc_group['Neville'] = (d.saccin_plt_n, d.saccin_sdms_n)
+
+    if 'cd' not in data.keys():
+        neurs = {}
+        for m, mdata in exper_data.items():
+            mfs = (mf,)*len(dfunc_group[m])
+            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
+                                           end, binsize, binstep=binstep, 
+                                           min_trials=min_trials, zscore=zscore,
+                                           causal_timing=causal_timing,
+                                           bhv_extract_func=pl.get_sacc_vel)
+            neurs[m] = out
+        data['cd'] = neurs
+    else:
+        neurs = data['cd']    
+        
+    vel_scatter_ax = f.add_subplot(vel_scatter_grid)
+    if 'cd' in gen_panels:
+        neurs = data['cd']
+        for m, (neur, xs, bhv) in neurs.items():
+            vcorr = pl.compute_velocity_firing_correlation(neur, xs, bhv,
+                                                           scatter_pt)
+            vcorr_pairs = np.array(list((v, vcorr[1][k])
+                                        for k, v in vcorr[0].items()))
+            gpl.print_mean_conf95(vcorr_pairs[:, 0], m, 'sDMST vcorr')
+            gpl.print_mean_conf95(vcorr_pairs[:, 1], m, 'PLT vcorr')
+            vel_scatter_ax.plot(vcorr_pairs[:, 0], vcorr_pairs[:, 1], 'o',
+                                color=monkey_colors[m])
+        gpl.clean_plot(vel_scatter_ax, 0)
+        gpl.make_yaxis_scale_bar(vel_scatter_ax, magnitude=.3, anchor=0,
+                                 label='PLT velocity\ncorrelation',
+                                 text_buff=.65)
+        gpl.make_xaxis_scale_bar(vel_scatter_ax, magnitude=.3, anchor=0,
+                                 label='sDMST velocity\ncorrelation',
+                                 text_buff=.4)
+            
+        
+    boots = params.getint('boots')
+    lims = None
+    scatter_pt = params.getint('check_pt')
+    scatter_ax = f.add_subplot(sacc_scatter_grid)
+    if 'cd' in gen_panels:
+        for m, neur in neurs.items():
+            print('{}: {} neurons, task'.format(m, len(neur[0][0])))
+            pl.plot_neuron_scatters(neur[:2], scatter_pt, lims=lims, boots=boots,
+                                    ax=scatter_ax, color=monkey_colors[m])
+        scatter_ax.set_xlabel('PLT activity (spikes/s)')
+
+    mf = d.fixation_acquired
+    if 'e' not in data.keys() and 'e' in gen_panels:
+        neurs = {}
+        for m, mdata in exper_data.items():
+            mfs = (mf,)*len(dfunc_group[m])
+            out = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs, start,
+                                           end, binsize, binstep=binstep, 
+                                           min_trials=min_trials, zscore=zscore,
+                                           causal_timing=causal_timing)
+            neurs[m] = out
+        data['e'] = neurs
+    
+    scatter_pt = 0
+    pre_scatter_ax = f.add_subplot(presacc_scatter_grid, sharex=scatter_ax,
+                                   sharey=scatter_ax)
+    if 'e' in gen_panels:
+        neurs = data['e']
+        for m, neur in neurs.items():
+            print('{}: {} neurons, pre'.format(m, len(neur[0][1])))
+            pl.plot_neuron_scatters(neur[:2], scatter_pt, lims=lims, boots=boots,
+                                    ax=pre_scatter_ax, color=monkey_colors[m])
+        pre_scatter_ax.set_ylabel('sDMST activity\n(spikes/s)')
+
+    mf1 = d.fixation_acquired
+    mf2 = d.first_sacc_func
+    diff_zscore = params.getboolean('diff_scatter_zscore')
+    if 'f' not in data.keys() and 'f' in gen_panels:
+        data['f'] = {}
+        for m, mdata in exper_data.items():
+            mfs1 = (mf1,)*len(dfunc_group[m])
+            out1 = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs1, start,
+                                           end, binsize, binstep=binstep, 
+                                           min_trials=min_trials, zscore=diff_zscore,
+                                           causal_timing=causal_timing)
+            diffs1 = pl.compute_average_diff(out1[0], out1[1], scatter_pt)
+            mfs2 = (mf2,)*len(dfunc_group[m])
+            out2 = na.organize_spiking_data(mdata[0], dfunc_group[m], mfs2, start,
+                                           end, binsize, binstep=binstep, 
+                                           min_trials=min_trials, zscore=diff_zscore,
+                                           causal_timing=causal_timing)
+            diffs2 = pl.compute_average_diff(out2[0], out2[1], scatter_pt)
+            data['f'][m] = diffs1, diffs2
+        
+    scatter_pt = 0
+    diff_scatter_ax = f.add_subplot(diff_scatter_grid)
+    if 'f' in gen_panels:
+        for i, (m, neur) in enumerate(neurs.items()):
+            diffs1, diffs2 = data['f'][m]
+            offset = (i - len(neurs)/2)/5
+            pre_diffs = np.array(list(diffs1.values()))
+            task_diffs = np.array(list(diffs2.values()))
+            n_greater_pre = np.sum(pre_diffs > 0)
+            n_greater_task = np.sum(task_diffs > 0)
+            s_temp = '{}: {} neurons fire more in sDMST, {}'
+            print(s_temp.format(m, n_greater_pre, 'pre'))
+            print(s_temp.format(m, n_greater_task, 'task'))
+            out = pl.plot_neuron_diffs(diffs1, diffs2, boots=boots,
+                                       ax=diff_scatter_ax,
+                                       color=monkey_colors[m], offset=offset)
+            d1_boots, d2_boots = out
+            gpl.print_mean_conf95(d1_boots, m, 'z-scored diff, pre',
+                                  preboot=True)
+            gpl.print_mean_conf95(d2_boots, m, 'z-scored diff, task',
+                                  preboot=True)
+            
+        gpl.clean_plot_bottom(diff_scatter_ax, keeplabels=True)
+        diff_scatter_ax.set_xticks([0, 1])
+        diff_scatter_ax.set_xticklabels(['pre', 'img'], rotation=90)
+        y_lab = 'sDMST - PLT\n(z-scored)'
+        gpl.make_yaxis_scale_bar(diff_scatter_ax, anchor=0, magnitude=.1,
+                                 double=False, label=y_lab,
+                                 text_buff=.9)
+    if bf is None:
+        bf = params.get('basefolder')
+    fname = os.path.join(bf, 'fig2-py.svg')
+    f.savefig(fname, bbox_inches='tight', transparent=True)
+    return data
+
+def figure2a(data=None, gen_panels=None, exper_data=None,
+             monkey_paths=pl.monkey_paths, config_file=config_path,
+             rand_eg=False, bf=None):
+    setup()
+    cf = u.ConfigParserColor()
+    cf.read(config_file)
+    params = cf['figure2a']
+    if exper_data is None:
+        exper_data = load_all_data(monkey_paths)
+    if gen_panels is None:
+        gen_panels = ('a', 'b', 'cd', 'e')
+    if data is None:
+        data = {}
+
+    fsize = (4, 2.5)
+    f = plt.figure(figsize=fsize)
+    gs = f.add_gridspec(100, 100)
+
+    loss_m1 = gs[:40, 50:65]
+    prob_m1 = gs[60:, 50:70]
+    
+    loss_m2 = gs[:40, 85:]
+    prob_m2 = gs[60:, 85:]
+
+    glm_axs = {'Neville':(loss_m1, prob_m1),
+               'Rufus':(loss_m2, prob_m2)}
+    
+    # colors
+    sdms_sc = params.getcolor('sdms_sacc_color')
+    plt_sc = params.getcolor('plt_sacc_color')
+    sdms_mc = params.getcolor('sdms_match_color')
+    plt_fc = params.getcolor('plt_fam_color')
+    comp_c = params.getcolor('comparison_color')
+    r_color = params.getcolor('rufus_color')
+    n_color = params.getcolor('neville_color')
+    monkey_colors = {'Rufus':r_color, 'Neville':n_color}
+
+    # fig 2 timing params
 
     start_glm = params.getint('start_glm')
     end_glm = params.getint('end_glm')
@@ -743,6 +669,8 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     av_only = params.getboolean('av_only')
     adapt_delta = params.getfloat('adapt_delta')
     req_trials = params.getint('min_trials_lm')
+    mf = d.first_sacc_func
+    
     if 'cd' not in data.keys():
         glm_dat = {}
         for m, mdata in exper_data.items():
@@ -755,13 +683,20 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
             glm_dat[m] = out_both
         data['cd'] = glm_dat
 
-    # # find good way to plot model comparison result
-    # if 'cd' in gen_panels:
-    #     neurs = data['cd']
-    #     for m, d_both in neurs.items():
-    #         axs_gs = glm_axs[m]
-    #         axs = list(f.add_subplot(ax) for ax in axs_gs)
-    #         fits_m, comps_m = d_both
+    # find good way to plot model comparison result
+    
+    if 'cd' in gen_panels:
+        neurs = data['cd']
+        for m, d_both in neurs.items():
+            axs_gs = glm_axs[m]
+            axs = list(f.add_subplot(ax) for ax in axs_gs)
+            fits_m, comps_m = d_both
+            out = pl.summarize_model_comparison(comps_m)
+            pl.plot_model_comparison(*out, axs=axs)
+    if bf is None:
+        bf = params.get('basefolder')
+    fname = os.path.join(bf, 'fig2a-py.svg')
+    f.savefig(fname, bbox_inches='tight', transparent=True)
     return data    
 
 def figure3(data=None, gen_panels=None, exper_data=None,
@@ -1228,7 +1163,7 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
         gpl.make_xaxis_scale_bar(match_sdms_ax, magnitude=match_xscale,
                                  label='normalized firing rate')
 
-        gpl.clean_plot_bottom(time_sdms_ax)
+        # gpl.clean_plot_bottom(time_sdms_ax)
         time_sdms_ax.set_title('sDMST', loc='left')
         time_sdms_ax.text(0, .98, 'condition-independent',
                           transform=time_sdms_ax.transAxes)
@@ -1236,7 +1171,7 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                           transform=sacc_sdms_ax.transAxes)
         match_sdms_ax.text(0, .98, 'image-dependent',
                           transform=match_sdms_ax.transAxes)
-        gpl.clean_plot_bottom(sacc_sdms_ax)
+        # gpl.clean_plot_bottom(sacc_sdms_ax)
 
     dfunc_group_plt = {}
     dfunc_group_plt['Rufus'] = (d.novin_saccin, d.novin_saccout,
@@ -1287,9 +1222,9 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
         gpl.make_xaxis_scale_bar(fam_plt_ax, magnitude=match_xscale,
                                  label='normalized firing rate')
 
-        gpl.clean_plot_bottom(time_plt_ax)
+        # gpl.clean_plot_bottom(time_plt_ax)
         time_plt_ax.set_title('PLT')
-        gpl.clean_plot_bottom(sacc_plt_ax)
+        # gpl.clean_plot_bottom(sacc_plt_ax)
         gpl.clean_plot(time_plt_ax, 1)
         gpl.clean_plot(sacc_plt_ax, 1)
         gpl.clean_plot(fam_plt_ax, 1)
@@ -1820,6 +1755,50 @@ def figure6(data=None, gen_panels=None, exper_data=None,
         bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig6-py.svg')
     f.savefig(fname, bbox_inches='tight', transparent=True)
+    return data
+
+def figure_si_saccdec(data=None, gen_panels=None, exper_data=None,
+                      monkey_paths=pl.monkey_paths, config_file=config_path,
+                      bf=None):
+    setup()
+    cf = u.ConfigParserColor()
+    cf.read(config_file)
+    params = cf['figure_saccdec']
+    if exper_data is None:
+        exper_data = load_all_data(monkey_paths)
+    if gen_panels is None:
+        gen_panels = ('a',)
+    if data is None:
+        data = {}
+
+    # fig SI-BHV arrangement
+    fsize = (4, 3)
+    f = plt.figure(figsize=fsize)
+    gs = f.add_gridspec(100, 100)
+
+    dfuncs = {'Rufus':(d.saccin_plt, d.saccin_sdms),
+              'Neville':(d.saccin_plt_n, d.saccin_sdms_n)}
+    mf = d.first_sacc_func
+    pretime = params.getint('pretime')
+    posttime = params.getint('posttime')
+    if 'a' not in data.keys() and 'a' in gen_panels:
+        data['a'] = {}
+        for m, (mdata, _) in exper_data.items():
+            mask1 = dfuncs[m][0](mdata)
+            mask2 = dfuncs[m][1](mdata)
+            mdata_masked1 = mdata[mask1]
+            mdata_masked2 = mdata[mask2]
+            ts1 = mf(mdata_masked1)
+            ts2 = mf(mdata_masked2)
+            out = pl.decode_task_from_eyepos(mdata_masked1['eyepos'], ts1,
+                                             mdata_masked2['eyepos'], ts2,
+                                             pretime, posttime,
+                                             class_weight='balanced')
+            data['a'][m] = out
+            print(out)
+            print(out.shape)
+    if 'a' in gen_panels:
+        pass
     return data
 
 def figure_si_bhv(data=None, gen_panels=None, exper_data=None,

@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import general.utility as u
+import general.stan_utility as su
 import general.neural_analysis as na
 import general.plotting as gpl
 import pref_looking.bias as b
@@ -272,7 +273,8 @@ def _get_label_filter(labels, label_set):
 def fit_stan_model(data, conds, labels, model_path, only_labels=None,
                    sdmst_num=(('task', 0),), stan_iters=2000, stan_chains=4,
                    sigma_var=1, beta_var=1, modul_var=1, arviz=na.glm_arviz,
-                   adapt_delta=.8, max_treedepth=10, **stan_params):
+                   adapt_delta=.8, max_treedepth=10, reduce_fit=True,
+                   **stan_params):
     data = np.squeeze(data)
     conds = np.squeeze(conds)
     sdmst_ind = list(labels).index(sdmst_num)
@@ -290,7 +292,15 @@ def fit_stan_model(data, conds, labels, model_path, only_labels=None,
                       control=control, **stan_params)
     diag = ps.diagnostics.check_hmc_diagnostics(fit)
     av = az.from_pystan(posterior=fit, **arviz)
+    fit = su.ModelFitContainer(fit)
+    if reduce_fit:
+        fit = fit_params_only(fit)
     return fit, diag, av
+
+def fit_params_only(fit, pop_keys=('log_lik', 'err_hat')):
+    for pk in pop_keys:
+        fit.samples.pop(pk)
+    return fit
 
 def fit_comparison_models(data, conds, labels, model_path=None,
                           model_path_modu=None, **fit_params):
@@ -361,25 +371,32 @@ def summarize_model_comparison(
     out_weight = {}
     out_weightsums = {}
     for cf in comps_f:
-        for mn in model_names:
-            mnl = out_loss.get(mn, [])
-            mnl.append(_get_rel_loss(cf, mn))
-            out_loss[mn] = mnl
-            mnw = out_weight.get(mn, [])
-            mnw.append(cf.loc[mn, 'weight'])
-            out_weight[mn] = mnw
+        null_loss = _get_rel_loss(cf, 'null')
+        if null_loss > 1:
+            for mn in model_names:
+                mnl = out_loss.get(mn, [])
+                mnl.append(_get_rel_loss(cf, mn))
+                out_loss[mn] = mnl
+                mnw = out_weight.get(mn, [])
+                mnw.append(cf.loc[mn, 'weight'])
+                out_weight[mn] = mnw
     for mn in model_names:
         w_b = u.bootstrap_list(np.array(out_weight[mn]), np.mean, n=n_boots)
         out_weightsums[mn] = w_b
     return out_loss, out_weight, out_weightsums
 
 def plot_model_comparison(loss, weight, weightsums, axs=None,
-                          keys=('pure', 'modulated', 'second', 'third'),
-                          fwid=1.5, n_boots=1000, eps=.001):
+                          keys=('pure', 'modulated', 'second'),
+                          fwid=1.5, n_boots=1000, eps=.001,
+                          labels=None):
+    if labels is None:
+        labels = {'second':'nonlinear'}
     if axs is None:
         f = plt.figure(figsize=(fwid, 2*fwid))
         ax_l = f.add_subplot(2, 1, 1)
         ax_ws = f.add_subplot(2, 1, 2)
+    else:
+        ax_l, ax_ws = axs
     ax_vals = []
     ax_labels = []
     cols = []
@@ -392,7 +409,10 @@ def plot_model_comparison(loss, weight, weightsums, axs=None,
         cols.append(col)
         vp_seq.append(weight[k])
         ax_vals.append(i)
-        ax_labels.append(k)
+        if labels.get(k, None) is None:
+            ax_labels.append(k)
+        else:
+            ax_labels.append(labels[k])
     print(np.sum(np.logical_or(np.array(loss['second']) < eps,
                                np.array(loss['third']) < eps)))
     subset = np.logical_and(np.logical_or(np.array(loss['second']) < eps,
@@ -407,10 +427,10 @@ def plot_model_comparison(loss, weight, weightsums, axs=None,
     ax_ws.set_yticklabels(ax_labels)
 
     ax_l.set_xlim([0, .9])
-    gpl.clean_plot_bottom(ax_l)
+    # gpl.clean_plot_bottom(ax_l)
     gpl.clean_plot(ax_l, 1, ticks=False)
-    gpl.make_xaxis_scale_bar(ax_l, magnitude=.5, double=False,
-                             label='fraction of neurons\nbest fit',
+    gpl.make_xaxis_scale_bar(ax_l, magnitude=.75, double=False,
+                             label='fraction best fit',
                              text_buff=.23)
     
     gpl.clean_plot(ax_ws, 1, horiz=True, ticks=False)
@@ -1259,6 +1279,37 @@ def generate_lowlevel_extract_func(folder, trls, reduce_func=np.mean,
     
     return extract_func
 
+def get_eyeslices(eps, ts, pre, post, diff=False, diff_n=0):
+    pres = ts + pre
+    posts = ts + post 
+    arrlen = 2*(post - pre)
+    if diff:
+        arrlen = arrlen - 2*diff_n
+    ep_arr = np.zeros((len(eps), arrlen))
+    for i, ep in enumerate(eps):
+        if len(ep) > posts[i]:
+            ei = ep[pres[i]:posts[i]]
+            if diff:
+                ei = np.diff(ei, n=diff_n, axis=0)
+            ep_arr[i] = np.reshape(ei, -1)
+        else:
+            ep_arr[i] = np.nan
+    mask = np.all(np.logical_not(np.isnan(ep_arr)), axis=1)
+    return ep_arr[mask].T
+
+def decode_task_from_eyepos(eps1, ts1, eps2, ts2, pretime, posttime,
+                            n_folds=20, diff=True, **params):
+    sls1 = get_eyeslices(eps1, ts1, pretime, posttime, diff=diff)
+    sls2 = get_eyeslices(eps2, ts2, pretime, posttime, diff=diff)
+    out = na.fold_skl(np.expand_dims(sls1, (1, -1)),
+                      np.expand_dims(sls2, (-1, 1)),
+                      n_folds, params=params)
+    print(out)
+    out = na.fold_skl(np.expand_dims(sls1, (1, -1)),
+                      np.expand_dims(sls2, (-1, 1)),
+                      n_folds, shuffle=True, params=params)
+    return out
+
 def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
                             binstep, min_trials, cond_labels,
                             dfunc_pts, min_spks=5, resample=100,
@@ -1307,7 +1358,7 @@ def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
     dpca_fits = {}
     for k, org in orgs.items():
         fits = []
-        print('{} neurons'.format(len(org[0, 0])))
+        print('{}: {} neurons'.format(k, len(org[0, 0])))
         for i in range(resample):
             if use_max_trials:
                 trls = max_trials
