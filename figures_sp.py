@@ -1063,13 +1063,17 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
     f = plt.figure(figsize=fsize) # , constrained_layout=True)
     gs = f.add_gridspec(100, 100)
     
-    time_sdms_grid = gs[:30, :40]
-    sacc_sdms_grid = gs[35:63, :40]
-    match_sdms_grid = gs[68:, :40]
+    time_comb_grid = gs[:30, :25]
+    sacc_comb_grid = gs[35:63, :25]
+    match_comb_grid = gs[68:, :25]
     
-    time_plt_grid = gs[:30, 40:80]
-    sacc_plt_grid = gs[35:63, 40:80]
-    fam_plt_grid = gs[68:, 40:80]
+    time_sdms_grid = gs[:30, 30:55]
+    sacc_sdms_grid = gs[35:63, 30:55]
+    fam_sdms_grid = gs[68:, 30:55]
+
+    time_plt_grid = gs[:30, 60:85]
+    sacc_plt_grid = gs[35:63, 60:85]
+    fam_plt_grid = gs[68:, 60:85]
     
     full_ev_grid = gs[:24, 92:]
     sacc_latency_grid = gs[40:64, 92:]
@@ -1105,44 +1109,53 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
     
     mf = d.first_sacc_func
 
-    dfunc_group_sdms = {}
-    dfunc_group_sdms['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+    dfunc_group_comb = {}
+    dfunc_group_comb['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
                                  d.saccin_nonmatch_g_sdms,
-                                 d.saccout_nonmatch_sdms)
-    dfunc_group_sdms['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
+                                 d.saccout_nonmatch_sdms,
+                                 d.novin_saccin, d.novin_saccout,
+                                 d.famin_saccin, d.famin_saccout)
+    dfunc_group_comb['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
                                    d.saccin_nonmatch_g_sdms_n,
-                                   d.saccout_nonmatch_sdms_n)
-    dfunc_pts = ((0, 0), (0, 1), (1, 0), (1, 1))
-    cond_labels_sdms = ('mst')
+                                   d.saccout_nonmatch_sdms_n,
+                                   d.novin_saccin_n, d.novin_saccout_n,
+                                   d.famin_saccin_n, d.famin_saccout_n)
+    dfunc_pts = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+                 (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
+    cond_labels_comb = ('bpst')
 
-    if 'c' not in data.keys() and ('c' in gen_panels or 'e' in gen_panels):
+    if 'cd' not in data.keys() and ('c' in gen_panels or 'd' in gen_panels
+                                    or 'e' in gen_panels):
         dpca_outs = {}
         for m, mdata in exper_data.items():
-            out = pl.organize_dpca_transform(mdata[0], dfunc_group_sdms[m], mf,
+            out = pl.organize_dpca_transform(mdata[0], dfunc_group_comb[m], mf,
                                              start, end, binsize, binstep,
-                                             min_trials, cond_labels_sdms, 
+                                             min_trials, cond_labels_comb, 
                                              dfunc_pts, use_avail_trials=True,
                                              resample=resample,
                                              use_max_trials=use_max_trials,
                                              with_replace=with_replace,
                                              min_spks=min_spks)
             dpca_outs[m] = out
-        data['c'] = dpca_outs
+        data['cd'] = dpca_outs
 
     signif_level = params.getfloat('signif_level_dpca')
     
-    time_sdms_ax = f.add_subplot(time_sdms_grid)
-    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid)
-    match_sdms_ax = f.add_subplot(match_sdms_grid)
-    ax_keys = (('t', time_sdms_ax), ('st', sacc_sdms_ax), ('mt', match_sdms_ax))
-    color_dict = {'t':sdms_tc, 'st':sdms_sc, 'mt':sdms_mc}
-    style_dict = {'t':np.array(((pro_s, pro_s), (anti_s, anti_s))),
-                  'st':np.array(((pro_s, anti_s), (pro_s, anti_s))),
-                  'mt':np.array(((pro_s, pro_s), (anti_s, anti_s)))}
-    dim_dict = {'t':0, 'st':1, 'mt':1}
-    signif_h_dict = {'t':0, 'st':-4.5, 'mt':-2}
+    time_comb_ax = f.add_subplot(time_comb_grid)
+    sacc_comb_ax = f.add_subplot(sacc_comb_grid)
+    match_comb_ax = f.add_subplot(match_comb_grid)
+    ax_keys = (('t', time_comb_ax), ('st', sacc_comb_ax), ('pt', match_comb_ax))
+    color_dict = {'t':sdms_tc, 'st':sdms_sc, 'pt':sdms_mc}
+    style_dict = {'t':np.array((((pro_s, pro_s), (anti_s, anti_s)),
+                                ((pro_s, pro_s), (anti_s, anti_s)))),
+                  'st':np.array((((pro_s, anti_s), (pro_s, anti_s)),
+                                 ((pro_s, anti_s), (pro_s, anti_s)))),
+                  'pt':np.array((((pro_s, pro_s), (anti_s, anti_s)),
+                                 ((pro_s, pro_s), (anti_s, anti_s))))}
+    dim_dict = {'t':0, 'st':1, 'pt':1}
+    signif_h_dict = {'t':0, 'st':-4.5, 'pt':-2}
     if 'c' in gen_panels:
-        for m, dpca_out in data['c'].items():
+        for m, dpca_out in data['cd'].items():
             if m == plot_monkey:
                 org, dpcas, xs = dpca_out
                 pl.plot_dpca_kernels(dpcas[0], xs, ax_keys, dim_dict=dim_dict,
@@ -1150,76 +1163,113 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                      color_dict=color_dict, style_dict=style_dict,
                                      signif_heights=signif_h_dict)
 
-        gpl.make_yaxis_scale_bar(time_sdms_ax, magnitude=40)
-        gpl.make_yaxis_scale_bar(sacc_sdms_ax, label='normalized firing rate',
-                                 magnitude=4, text_buff=.19)
-        gpl.make_yaxis_scale_bar(match_sdms_ax, magnitude=2)
-
-        time_xscale = 20
-        sacc_xscale = 10
-        match_xscale = 5
-        gpl.make_xaxis_scale_bar(time_sdms_ax, magnitude=time_xscale, label='')
-        gpl.make_xaxis_scale_bar(sacc_sdms_ax, magnitude=sacc_xscale, label='')
-        gpl.make_xaxis_scale_bar(match_sdms_ax, magnitude=match_xscale,
+        comb_time_yscale = 10
+        comb_sacc_yscale = 10
+        comb_match_yscale = 2
+        gpl.make_yaxis_scale_bar(time_comb_ax, magnitude=comb_time_yscale)
+        gpl.make_yaxis_scale_bar(sacc_comb_ax, label='normalized firing rate',
+                                 magnitude=comb_sacc_yscale, text_buff=.19)
+        gpl.make_yaxis_scale_bar(match_comb_ax, magnitude=comb_match_yscale)
+                
+        comb_time_xscale = 20
+        comb_sacc_xscale = 5
+        comb_match_xscale = 2
+        gpl.make_xaxis_scale_bar(time_comb_ax, magnitude=comb_time_xscale, label='')
+        gpl.make_xaxis_scale_bar(sacc_comb_ax, magnitude=comb_sacc_xscale, label='')
+        gpl.make_xaxis_scale_bar(match_comb_ax, magnitude=comb_match_xscale,
                                  label='normalized firing rate')
 
-        # gpl.clean_plot_bottom(time_sdms_ax)
-        time_sdms_ax.set_title('sDMST', loc='left')
-        time_sdms_ax.text(0, .98, 'condition-independent',
-                          transform=time_sdms_ax.transAxes)
-        sacc_sdms_ax.text(0, .98, 'saccade-dependent',
-                          transform=sacc_sdms_ax.transAxes)
-        match_sdms_ax.text(0, .98, 'image-dependent',
-                          transform=match_sdms_ax.transAxes)
+        # gpl.clean_plot_bottom(time_comb_ax)
+        time_comb_ax.set_title('sDMST', loc='left')
+        time_comb_ax.text(0, .98, 'condition-independent',
+                          transform=time_comb_ax.transAxes)
+        sacc_comb_ax.text(0, .98, 'saccade-dependent',
+                          transform=sacc_comb_ax.transAxes)
+        match_comb_ax.text(0, .98, 'image-dependent',
+                          transform=match_comb_ax.transAxes)
         # gpl.clean_plot_bottom(sacc_sdms_ax)
 
-    dfunc_group_plt = {}
-    dfunc_group_plt['Rufus'] = (d.novin_saccin, d.novin_saccout,
-                                d.famin_saccin, d.famin_saccout)
-    dfunc_group_plt['Neville'] = (d.novin_saccin_n, d.novin_saccout_n,
-                                  d.famin_saccin_n, d.famin_saccout_n)
-    dfunc_pts = ((0, 0), (0, 1), (1, 0), (1, 1))
-    cond_labels_plt = ('fst')
-    if 'd' not in data.keys() and ('d' in gen_panels or 'e' in gen_panels):
-        dpca_outs = {}
-        for m, mdata in exper_data.items():
-            out = pl.organize_dpca_transform(mdata[0], dfunc_group_plt[m], mf,
-                                             start, end, binsize, binstep,
-                                             min_trials, cond_labels_plt, 
-                                             dfunc_pts, use_avail_trials=True,
-                                             use_max_trials=use_max_trials,
-                                             resample=resample,
-                                             with_replace=with_replace,
-                                             min_spks=min_spks)
-            dpca_outs[m] = out
-        data['d'] = dpca_outs
+    style_dict = {'bt':np.array(((pro_s, pro_s), (anti_s, anti_s))),
+                  'bst':np.array(((pro_s, anti_s), (pro_s, anti_s))),
+                  'bpt':np.array(((pro_s, pro_s), (anti_s, anti_s)))}
+    dim_dict = {'bt':0, 'bst':1, 'bpt':1}
+    signif_h_dict = {'bt':0, 'bst':-4.6, 'bpt':-2}
+    
+    time_sdms_ax = f.add_subplot(time_sdms_grid)
+    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid)
+    fam_sdms_ax = f.add_subplot(fam_sdms_grid)
+    color_dict = {'bt':sdms_tc, 'bst':sdms_sc, 'bpt':sdms_mc}
+    ax_keys = (('bt', time_sdms_ax), ('bst', sacc_sdms_ax), ('bpt', fam_sdms_ax))
+    task_ind_sdms = 0                    
+    if 'd' in gen_panels:
+        for m, dpca_out in data['cd'].items():
+            if m == plot_monkey:
+                org, dpcas, xs = dpca_out
+                pl.plot_dpca_kernels(dpcas[0], xs, ax_keys, dim_dict=dim_dict,
+                                     signif_level=signif_level,
+                                     color_dict=color_dict, style_dict=style_dict,
+                                     signif_heights=signif_h_dict,
+                                     task_ind=task_ind_sdms)
+
+        task_time_yscale = 5
+        task_sacc_yscale = 2
+        task_match_yscale = 1
+        gpl.make_yaxis_scale_bar(time_sdms_ax, magnitude=task_time_yscale)
+        gpl.make_yaxis_scale_bar(sacc_sdms_ax, label='normalized firing rate',
+                                 magnitude=task_sacc_yscale, text_buff=.19)
+        gpl.make_yaxis_scale_bar(fam_sdms_ax, magnitude=task_match_yscale)
+
+        task_time_xscale = 5
+        task_sacc_xscale = 2
+        task_match_xscale = 2
+        gpl.make_xaxis_scale_bar(time_sdms_ax, magnitude=task_time_xscale,
+                                 label='')
+        gpl.make_xaxis_scale_bar(sacc_sdms_ax, magnitude=task_sacc_xscale,
+                                 label='')
+        gpl.make_xaxis_scale_bar(fam_sdms_ax, magnitude=task_match_xscale,
+                                 label='normalized firing rate')
+
+        time_sdms_ax.set_title('sDMST')
+        gpl.clean_plot(time_sdms_ax, 1)
+        gpl.clean_plot(sacc_sdms_ax, 1)
+        gpl.clean_plot(fam_sdms_ax, 1)
+        pro_sleg = lines.Line2D([], [], color=plt_tc, linestyle=pro_s,
+                             label='saccade in')
+        anti_sleg = lines.Line2D([], [], color=plt_tc, linestyle=anti_s,
+                              label='saccade out')
+        sacc_sdms_ax.legend(handles=(pro_sleg, anti_sleg), frameon=False,
+                           loc='upper left')
+        pro_mleg = lines.Line2D([], [], color=plt_tc, linestyle=pro_s,
+                             label='nov/match in')
+        anti_mleg = lines.Line2D([], [], color=plt_tc, linestyle=anti_s,
+                              label='fam/nonmatch in')
+        fam_sdms_ax.legend(handles=(pro_mleg, anti_mleg), frameon=False,
+                           loc='upper left')
 
     time_plt_ax = f.add_subplot(time_plt_grid, sharex=time_sdms_ax,
                                 sharey=time_sdms_ax)
     sacc_plt_ax = f.add_subplot(sacc_plt_grid, sharey=sacc_sdms_ax,
                                 sharex=sacc_sdms_ax)
-    fam_plt_ax = f.add_subplot(fam_plt_grid, sharey=match_sdms_ax,
-                               sharex=match_sdms_ax)
-    ax_keys = (('t', time_plt_ax), ('st', sacc_plt_ax), ('ft', fam_plt_ax))
-    color_dict = {'t':plt_tc, 'st':plt_sc, 'ft':plt_fc}
-    style_dict = {'t':np.array(((pro_s, pro_s), (anti_s, anti_s))),
-                  'st':np.array(((pro_s, anti_s), (pro_s, anti_s))),
-                  'ft':np.array(((pro_s, pro_s), (anti_s, anti_s)))}
-    dim_dict = {'t':0, 'st':1, 'ft':1}
-    signif_h_dict = {'t':0, 'st':-4.6, 'ft':-2}
+    fam_plt_ax = f.add_subplot(fam_plt_grid, sharey=fam_sdms_ax,
+                               sharex=fam_sdms_ax)
+    color_dict = {'bt':plt_tc, 'bst':plt_sc, 'bpt':plt_fc}
+    ax_keys = (('bt', time_plt_ax), ('bst', sacc_plt_ax), ('bpt', fam_plt_ax))       
+    task_ind_plt = 1
     if 'd' in gen_panels:
-        for m, dpca_out in data['d'].items():
+        for m, dpca_out in data['cd'].items():
             if m == plot_monkey:
                 org, dpcas, xs = dpca_out
                 pl.plot_dpca_kernels(dpcas[0], xs, ax_keys, dim_dict=dim_dict,
                                      signif_level=signif_level,
                                      color_dict=color_dict, style_dict=style_dict,
-                                     signif_heights=signif_h_dict)
-        gpl.make_xaxis_scale_bar(time_plt_ax, magnitude=time_xscale,
+                                     signif_heights=signif_h_dict,
+                                     task_ind=task_ind_plt)
+                
+        gpl.make_xaxis_scale_bar(time_plt_ax, magnitude=task_time_xscale,
                                  label='')
-        gpl.make_xaxis_scale_bar(sacc_plt_ax, magnitude=sacc_xscale,
+        gpl.make_xaxis_scale_bar(sacc_plt_ax, magnitude=task_sacc_xscale,
                                  label='')
-        gpl.make_xaxis_scale_bar(fam_plt_ax, magnitude=match_xscale,
+        gpl.make_xaxis_scale_bar(fam_plt_ax, magnitude=task_match_xscale,
                                  label='normalized firing rate')
 
         # gpl.clean_plot_bottom(time_plt_ax)

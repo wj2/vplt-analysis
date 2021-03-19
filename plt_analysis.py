@@ -1361,7 +1361,7 @@ def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
     dpca_fits = {}
     for k, org in orgs.items():
         fits = []
-        print('{}: {} neurons'.format(k, len(org[0, 0])))
+        print('{}: {} neurons'.format(k, len(org[0, 0, 0])))
         for i in range(resample):
             if use_max_trials:
                 trls = max_trials
@@ -1390,11 +1390,13 @@ def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
 
 def plot_dpca_kernels(dpca, xs, axs_keys, dim_dict=0, arr_labels=None,
                       signif_level=.01, color_dict=None, style_dict=None,
-                      signif_heights=None, signif_height_default=5):
+                      signif_heights=None, signif_height_default=5,
+                      task_ind=None):
     kerns, _, scores, shuff_scores, ev = dpca
     if signif_heights is None:
         signif_heights = {k[0]:signif_height_default for k in axs_keys}
     for (k, ax) in axs_keys:
+        print(kerns['t'].shape)
         dim = dim_dict[k]
         if k in shuff_scores.keys():
             num_shuffs = len(shuff_scores[k])
@@ -1407,6 +1409,9 @@ def plot_dpca_kernels(dpca, xs, axs_keys, dim_dict=0, arr_labels=None,
         # kern = kerns[k][dim]
         kern = kerns[k][0]
         kern2 = kerns[k][1]
+        if task_ind is not None:
+            kern = kern[task_ind]
+            kern2 = kern2[task_ind]
         sig = pval < signif_level
         ax_shape = kern.shape[:-1]
         ind_combs = itertools.product(*(range(x) for x in ax_shape))
