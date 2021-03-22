@@ -14,6 +14,7 @@ from sklearn import svm
 import pickle
 import pystan as ps
 import arviz as az
+import pandas as pd
 
 monkey_paths = {'Stan':'pref_looking/data-stan-itc/',
                 'Bootsy':'pref_looking/data-bootsy-itc/',
@@ -366,16 +367,31 @@ def _get_rel_loss(cf, model_name, deviance='d_loo', deviance_uncertainty='dse'):
     return pl
 
 def summarize_model_comparison(
-        comps,
+        fits, comps,
         model_names=('pure', 'modulated', 'second', 'third'),
         n_boots=1000):
-    comps_f = list(filter(lambda x: not np.any(x.loc[:, 'warning']), comps))
+    fits_arr = np.array(fits)
+    comps_arr = np.zeros(len(comps), dtype=object)
+    comps_arr[:] = comps
+    comps_filt = np.array(list(not np.any(x.loc[:, 'warning'])
+                               for x in comps))
+    comps_f = comps_arr[comps_filt]
+    fits_f = fits_arr[comps_filt]    
     out_loss = {}
     out_weight = {}
     out_weightsums = {}
-    for cf in comps_f:
+    out_mods = []
+    for i, cf in enumerate(comps_f):
         null_loss = _get_rel_loss(cf, 'null')
         if null_loss > 1:
+            nonl_params = fits_arr[i]['second'][0]
+            modu_params = fits_arr[i]['modulated'][0]
+            mods_i = np.mean(fits_arr[i]['modulated'][0].samples['modulator'])
+            print('mi', mods_i)
+            print('plt', np.mean(modu_params.samples['beta'], axis=0))
+            print('sdms', np.mean((mods_i + 1)*modu_params.samples['beta'],
+                                  axis=0))
+            out_mods.append(mods_i)
             for mn in model_names:
                 mnl = out_loss.get(mn, [])
                 mnl.append(_get_rel_loss(cf, mn))
@@ -386,7 +402,18 @@ def summarize_model_comparison(
     for mn in model_names:
         w_b = u.bootstrap_list(np.array(out_weight[mn]), np.mean, n=n_boots)
         out_weightsums[mn] = w_b
-    return out_loss, out_weight, out_weightsums
+    out_metrics = (out_mods,)
+    return out_loss, out_weight, out_weightsums, out_metrics
+
+def plot_fit_data(fits):
+    mod_fits = list(f['modulated'] for f in fits)
+    non_fits = list(f['second'] for f in fits)
+    mods = np.zeros(len(mod_fits))
+    nons = np.zeros_like(mods)
+    for i, (mf, warns) in enumerate(mod_fits):
+        mods[i] = np.mean(mf.samples['modulator'])
+    return mods
+        
 
 def plot_model_comparison(loss, weight, weightsums, axs=None,
                           keys=('pure', 'modulated', 'second'),

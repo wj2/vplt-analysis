@@ -691,8 +691,8 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
             axs_gs = glm_axs[m]
             axs = list(f.add_subplot(ax) for ax in axs_gs)
             fits_m, comps_m = d_both
-            out = pl.summarize_model_comparison(comps_m)
-            pl.plot_model_comparison(*out, axs=axs)
+            out = pl.summarize_model_comparison(fits_m, comps_m)
+            pl.plot_model_comparison(*out[:-1], axs=axs)
     if bf is None:
         bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig2a-py.svg')
