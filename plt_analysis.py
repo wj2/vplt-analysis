@@ -318,10 +318,10 @@ def fit_comparison_models(data, conds, labels, model_path=None,
     out_pure = fit_stan_model(data, conds, labels, model_path,
                               only_labels=pure_conds, **fit_params)
 
-    modulated_conds = list(filter(lambda x: len(x) == 1,
-                                  labels))
+    # modulated_conds = list(filter(lambda x: len(x) == 1,
+    #                               labels))
     out_mod = fit_stan_model(data, conds, labels, model_path_modu,
-                             only_labels=modulated_conds, **fit_params)
+                             only_labels=pure_conds, **fit_params)
 
     second_conds = list(filter(lambda x: len(x) < 3,
                                labels))
