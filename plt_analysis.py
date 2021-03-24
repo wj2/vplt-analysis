@@ -371,7 +371,7 @@ def compare_models(data, tc, tw, marker_func, constr_funcs, constr_inds, labels,
             comp_all.append(comp)
         if max_fit is not None and i + 1 > max_fit:
             break
-    return fits_all, comp_all
+    return fits_all, comp_all, glm_lab
 
 def _get_rel_loss(cf, model_name, deviance='d_loo', deviance_uncertainty='dse'):
     pl = cf.loc[model_name, deviance]

@@ -690,7 +690,7 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
         for m, d_both in neurs.items():
             axs_gs = glm_axs[m]
             axs = list(f.add_subplot(ax) for ax in axs_gs)
-            fits_m, comps_m = d_both
+            fits_m, comps_m, labs_m = d_both
             out = pl.summarize_model_comparison(fits_m, comps_m)
             pl.plot_model_comparison(*out[:-1], axs=axs)
     if bf is None:
