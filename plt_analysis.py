@@ -304,11 +304,16 @@ def fit_params_only(fit, pop_keys=('log_lik', 'err_hat')):
     return fit
 
 def fit_comparison_models(data, conds, labels, model_path=None,
-                          model_path_modu=None, **fit_params):
+                          model_path_modu=None, model_path_cv=None,
+                          model_path_modu_cv=None, **fit_params):
     if model_path is None:
         model_path = na.stan_file_glm_nomean
     if model_path_modu is None:
         model_path_modu = na.stan_file_glm_modu_nomean
+    if model_path_modu_cv is None:
+        model_path_modu_cv = na.stan_file_glm_modu_nomean_cv
+    if model_path_cv is None:
+        model_path_cv = na.stan_file_glm_nomean_cv
 
     out_null = fit_stan_model(data, conds, labels, model_path, only_labels=(),
                               **fit_params)
@@ -323,19 +328,27 @@ def fit_comparison_models(data, conds, labels, model_path=None,
     out_mod = fit_stan_model(data, conds, labels, model_path_modu,
                              only_labels=pure_conds, **fit_params)
 
+    out_mod_cv = fit_stan_model(data, conds, labels, model_path_modu_cv,
+                                only_labels=pure_conds, **fit_params)
+
     second_conds = list(filter(lambda x: len(x) < 3,
                                labels))
     out_sec = fit_stan_model(data, conds, labels, model_path,
                              only_labels=second_conds)
 
+    out_sec_cv = fit_stan_model(data, conds, labels, model_path_cv,
+                                only_labels=second_conds)
+
     out_third = fit_stan_model(data, conds, labels, model_path, **fit_params)
 
     models = {'pure':out_pure[:2], 'modulated':out_mod[:2],
               'second':out_sec[:2], 'third':out_third[:2],
-              'null':out_null[:2]}
+              'null':out_null[:2], 'modulated_cv':out_mod_cv[:2],
+              'second_cv':out_sec_cv[:2]}
     models_ar = {'pure':out_pure[2], 'modulated':out_mod[2],
                  'second':out_sec[2], 'third':out_third[2],
-                 'null':out_null[2]}
+                 'null':out_null[2], 'modulated_cv':out_mod_cv[2],
+                 'second_cv':out_sec_cv[2]}
     return models, models_ar
 
 def compare_models(data, tc, tw, marker_func, constr_funcs, constr_inds, labels,
