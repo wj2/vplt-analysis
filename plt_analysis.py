@@ -303,6 +303,14 @@ def fit_params_only(fit, pop_keys=('log_lik', 'err_hat')):
         fit.samples.pop(pk)
     return fit
 
+def get_pure_conds(labels):
+    return list(filter(lambda x: len(x) == 1 and x[0][0] != 'task',
+                                labels))
+
+def get_nth_conds(labels, nth):
+    return list(filter(lambda x: len(x) < nth + 1,
+                                labels))
+
 def fit_comparison_models(data, conds, labels, model_path=None,
                           model_path_modu=None, model_path_cv=None,
                           model_path_modu_cv=None, **fit_params):
@@ -317,9 +325,11 @@ def fit_comparison_models(data, conds, labels, model_path=None,
 
     out_null = fit_stan_model(data, conds, labels, model_path, only_labels=(),
                               **fit_params)
-    
-    pure_conds = list(filter(lambda x: len(x) == 1 and x[0][0] != 'task',
-                             labels))
+
+    out_null2 = fit_stan_model(data, conds, labels, model_path_modu_cv,
+                               only_labels=(), **fit_params)
+
+    pure_conds = get_pure_conds(labels)
     out_pure = fit_stan_model(data, conds, labels, model_path,
                               only_labels=pure_conds, **fit_params)
 
@@ -331,8 +341,7 @@ def fit_comparison_models(data, conds, labels, model_path=None,
     out_mod_cv = fit_stan_model(data, conds, labels, model_path_modu_cv,
                                 only_labels=pure_conds, **fit_params)
 
-    second_conds = list(filter(lambda x: len(x) < 3,
-                               labels))
+    second_conds = get_nth_conds(labels, 2)
     out_sec = fit_stan_model(data, conds, labels, model_path,
                              only_labels=second_conds)
 
@@ -343,11 +352,13 @@ def fit_comparison_models(data, conds, labels, model_path=None,
 
     models = {'pure':out_pure[:2], 'modulated':out_mod[:2],
               'second':out_sec[:2], 'third':out_third[:2],
-              'null':out_null[:2], 'modulated_cv':out_mod_cv[:2],
+              'null':out_null[:2], 'null2':out_null2[:2],
+              'modulated_cv':out_mod_cv[:2],
               'second_cv':out_sec_cv[:2]}
     models_ar = {'pure':out_pure[2], 'modulated':out_mod[2],
                  'second':out_sec[2], 'third':out_third[2],
-                 'null':out_null[2], 'modulated_cv':out_mod_cv[2],
+                 'null':out_null[2], 'null2':out_null[2],
+                 'modulated_cv':out_mod_cv[2],
                  'second_cv':out_sec_cv[2]}
     return models, models_ar
 
@@ -379,10 +390,21 @@ def _get_rel_loss(cf, model_name, deviance='d_loo', deviance_uncertainty='dse'):
         pl = pl/cf.loc[model_name, deviance_uncertainty]
     return pl
 
+def get_label_samps(params, k, labels, samples_key):
+    k_ind = labels.index(k)
+    samps = params.samples[samples_key][:, k_ind]
+    return samps
+
+def get_label_diff(params, k1, k2, labels, samples_key='beta'):
+    k1_samps = get_label_samps(params, k1, labels, samples_key)
+    k2_samps = get_label_samps(params, k2, labels, samples_key)
+    return k2_samps - k1_samps
+
 def summarize_model_comparison(
-        fits, comps,
-        model_names=('pure', 'modulated', 'second', 'third'),
-        n_boots=1000):
+        fits, comps, labels,
+        model_names=('pure', 'modulated', 'modulated_cv',
+                     'second', 'second_cv', 'third'),
+        n_boots=1000, ct=np.median):
     fits_arr = np.array(fits)
     comps_arr = np.zeros(len(comps), dtype=object)
     comps_arr[:] = comps
@@ -394,16 +416,72 @@ def summarize_model_comparison(
     out_weight = {}
     out_weightsums = {}
     out_mods = []
+    mean_deltas = []
+    nonl_sacc = []
+    nonl_prior = []
+    modu_sacc = []
+    modu_prior = []
+    mean_sigs = []
+    pure_conds = get_pure_conds(labels)
+    sec_conds = get_nth_conds(labels, 2)
     for i, cf in enumerate(comps_f):
         null_loss = _get_rel_loss(cf, 'null')
         if null_loss > 1:
-            nonl_params = fits_arr[i]['second'][0]
-            modu_params = fits_arr[i]['modulated'][0]
-            mods_i = np.mean(fits_arr[i]['modulated'][0].samples['modulator'])
-            print('mi', mods_i)
-            print('plt', np.mean(modu_params.samples['beta'], axis=0))
-            print('sdms', np.mean((mods_i + 1)*modu_params.samples['beta'],
-                                  axis=0))
+            mods_i = fits_arr[i]['modulated_cv'][0].samples['modulator']
+            sigs_modu_i = fits_arr[i]['modulated_cv'][0].samples['sigma']
+            sigs_nonl_i = fits_arr[i]['second_cv'][0].samples['sigma']
+            mean_sigs.append((ct(-np.diff(sigs_modu_i, axis=1)),
+                              ct(-np.diff(sigs_nonl_i, axis=1))))
+            nonl_params = fits_arr[i]['second_cv'][0]
+            modu_params = fits_arr[i]['modulated_cv'][0]
+            sacc_plt_modu = get_label_diff(modu_params,
+                                           (('sacc', 1),),
+                                           (('sacc', 0),),
+                                           pure_conds)
+            prior_plt_modu = get_label_diff(modu_params,
+                                            (('priority', 1),),
+                                            (('priority', 0),),
+                                            pure_conds)
+            sacc_sdms_modu = sacc_plt_modu*(1 + mods_i)
+            prior_sdms_modu = prior_plt_modu*(1 + mods_i)
+            modu_sacc.append((ct(sacc_plt_modu), ct(sacc_sdms_modu)))
+            modu_prior.append((ct(prior_plt_modu), ct(prior_sdms_modu)))
+            
+            tmdelt_modu = -np.diff(modu_params.samples['tm'], axis=1)
+            tmdelt_sec = get_label_diff(nonl_params, (('task', 0),),
+                                        (('task', 1),), sec_conds)
+
+            sacc_plt = get_label_diff(nonl_params,
+                                      (('task', 1), ('sacc', 1)),
+                                      (('task', 1), ('sacc', 0)),
+                                      sec_conds)
+            
+            sacc_sdms = get_label_diff(nonl_params,
+                                       (('task', 0), ('sacc', 1)),
+                                       (('task', 0), ('sacc', 0)),
+                                       sec_conds)
+            sacc_gen = get_label_diff(nonl_params,
+                                      (('sacc', 1),), (('sacc', 0),),
+                                      sec_conds)
+
+            prior_plt = get_label_diff(nonl_params,
+                                       (('task', 1), ('priority', 1)),
+                                       (('task', 1), ('priority', 0)),
+                                       sec_conds)
+            prior_sdms = get_label_diff(nonl_params,
+                                        (('task', 0), ('priority', 1)),
+                                        (('task', 0), ('priority', 0)),
+                                       sec_conds)
+            prior_gen = get_label_diff(nonl_params,
+                                       (('priority', 1),), (('priority', 0),),
+                                       sec_conds)
+                                       
+            mean_deltas.append((ct(tmdelt_modu),
+                                ct(tmdelt_sec)))
+            nonl_sacc.append((ct(sacc_plt + sacc_gen),
+                              ct(sacc_sdms + sacc_gen)))
+            nonl_prior.append((ct(prior_plt + prior_gen),
+                                ct(prior_sdms + prior_gen)))
             out_mods.append(mods_i)
             for mn in model_names:
                 mnl = out_loss.get(mn, [])
@@ -413,9 +491,12 @@ def summarize_model_comparison(
                 mnw.append(cf.loc[mn, 'weight'])
                 out_weight[mn] = mnw
     for mn in model_names:
-        w_b = u.bootstrap_list(np.array(out_weight[mn]), np.mean, n=n_boots)
+        w_b = u.bootstrap_list(np.array(out_weight[mn]), ct, n=n_boots)
         out_weightsums[mn] = w_b
-    out_metrics = (out_mods,)
+    out_metrics = (ct(np.array(out_mods), axis=1), np.array(mean_deltas),
+                   np.array(nonl_sacc), np.array(nonl_prior),
+                   np.array(modu_sacc), np.array(modu_prior),
+                   np.array(mean_sigs))
     return out_loss, out_weight, out_weightsums, out_metrics
 
 def plot_fit_data(fits):
@@ -426,10 +507,10 @@ def plot_fit_data(fits):
     for i, (mf, warns) in enumerate(mod_fits):
         mods[i] = np.mean(mf.samples['modulator'])
     return mods
-        
 
 def plot_model_comparison(loss, weight, weightsums, axs=None,
-                          keys=('pure', 'modulated', 'second'),
+                          keys=('pure', 'modulated', 'modulated_cv',
+                                'second', 'second_cv'),
                           fwid=1.5, n_boots=1000, eps=.001,
                           labels=None):
     if labels is None:
