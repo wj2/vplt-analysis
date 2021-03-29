@@ -357,7 +357,7 @@ def fit_comparison_models(data, conds, labels, model_path=None,
               'second_cv':out_sec_cv[:2]}
     models_ar = {'pure':out_pure[2], 'modulated':out_mod[2],
                  'second':out_sec[2], 'third':out_third[2],
-                 'null':out_null[2], 'null2':out_null[2],
+                 'null':out_null[2], 'null2':out_null2[2],
                  'modulated_cv':out_mod_cv[2],
                  'second_cv':out_sec_cv[2]}
     return models, models_ar
