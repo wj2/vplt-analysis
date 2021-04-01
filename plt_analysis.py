@@ -404,7 +404,8 @@ def summarize_model_comparison(
         fits, comps, labels,
         model_names=('pure', 'modulated', 'modulated_cv',
                      'second', 'second_cv', 'third'),
-        n_boots=1000, ct=np.median):
+        n_boots=2000, ct=np.median, null_keys=('null', 'null2'),
+        err_thr=1, monkey_name=''):
     fits_arr = np.array(fits)
     comps_arr = np.zeros(len(comps), dtype=object)
     comps_arr[:] = comps
@@ -424,9 +425,22 @@ def summarize_model_comparison(
     mean_sigs = []
     pure_conds = get_pure_conds(labels)
     sec_conds = get_nth_conds(labels, 2)
+    null2_best = 0
+    null_best = 0
     for i, cf in enumerate(comps_f):
-        null_loss = _get_rel_loss(cf, 'null')
-        if null_loss > 1:
+        null_loss = np.array(list(_get_rel_loss(cf, nk) for nk in null_keys))
+        if (_get_rel_loss(cf, 'null2') < err_thr
+            and _get_rel_loss(cf, 'null') > err_thr):
+            null2_best = null2_best + 1
+        if _get_rel_loss(cf, 'null') < err_thr:
+            null_best = null_best + 1
+        if np.all(null_loss > err_thr):
+            print('---')
+            print(_get_rel_loss(cf, 'pure'))
+            print(_get_rel_loss(cf, 'modulated'))
+            print(_get_rel_loss(cf, 'modulated_cv'))
+            print(_get_rel_loss(cf, 'second'))
+            print(_get_rel_loss(cf, 'second_cv'))
             mods_i = fits_arr[i]['modulated_cv'][0].samples['modulator']
             sigs_modu_i = fits_arr[i]['modulated_cv'][0].samples['sigma']
             sigs_nonl_i = fits_arr[i]['second_cv'][0].samples['sigma']
@@ -448,8 +462,8 @@ def summarize_model_comparison(
             modu_prior.append((ct(prior_plt_modu), ct(prior_sdms_modu)))
             
             tmdelt_modu = -np.diff(modu_params.samples['tm'], axis=1)
-            tmdelt_sec = get_label_diff(nonl_params, (('task', 0),),
-                                        (('task', 1),), sec_conds)
+            tmdelt_sec = get_label_diff(nonl_params, (('task', 1),),
+                                        (('task', 0),), sec_conds)
 
             sacc_plt = get_label_diff(nonl_params,
                                       (('task', 1), ('sacc', 1)),
@@ -478,10 +492,12 @@ def summarize_model_comparison(
                                        
             mean_deltas.append((ct(tmdelt_modu),
                                 ct(tmdelt_sec)))
-            nonl_sacc.append((ct(sacc_plt + sacc_gen),
+            nonl_sacc.append((ct(sacc_gen),
+                              ct(sacc_plt + sacc_gen),
                               ct(sacc_sdms + sacc_gen)))
-            nonl_prior.append((ct(prior_plt + prior_gen),
-                                ct(prior_sdms + prior_gen)))
+            nonl_prior.append((ct(prior_gen),
+                               ct(prior_plt + prior_gen),
+                               ct(prior_sdms + prior_gen)))
             out_mods.append(mods_i)
             for mn in model_names:
                 mnl = out_loss.get(mn, [])
@@ -490,37 +506,45 @@ def summarize_model_comparison(
                 mnw = out_weight.get(mn, [])
                 mnw.append(cf.loc[mn, 'weight'])
                 out_weight[mn] = mnw
+    non_null_str = 'best fit by non-null model'
+    frac_str = '{}: {} / {} neurons {}'
+    frac_print = frac_str.format(monkey_name, len(nonl_sacc), len(comps_f),
+                                 non_null_str)
+    print(frac_print)
+    null_str = 'best fit by null model'
+    print(frac_str.format(monkey_name, null_best, len(comps_f), null_str))
+    null2_str = 'best by modulated null model'
+    print(frac_str.format(monkey_name, null2_best, len(comps_f), null2_str))    
+    
     for mn in model_names:
         w_b = u.bootstrap_list(np.array(out_weight[mn]), ct, n=n_boots)
         out_weightsums[mn] = w_b
-    out_metrics = (ct(np.array(out_mods), axis=1), np.array(mean_deltas),
-                   np.array(nonl_sacc), np.array(nonl_prior),
-                   np.array(modu_sacc), np.array(modu_prior),
-                   np.array(mean_sigs))
+        desc_string = '{} model best fit'.format(mn)
+        gpl.print_mean_conf95(out_loss[mn], monkey_name, desc_string,
+                              func=lambda x: np.nanmean(x < 1))
+
+    out_metrics = {'mods':ct(np.array(out_mods), axis=1),
+                   'mean_fr':np.array(mean_deltas),
+                   'sacc_nonl':np.array(nonl_sacc),
+                   'prior_nonl':np.array(nonl_prior),
+                   'sacc_modu':np.array(modu_sacc),
+                   'prior_modu':np.array(modu_prior),
+                   'sigma':np.array(mean_sigs)}
     return out_loss, out_weight, out_weightsums, out_metrics
 
-def plot_fit_data(fits):
-    mod_fits = list(f['modulated'] for f in fits)
-    non_fits = list(f['second'] for f in fits)
-    mods = np.zeros(len(mod_fits))
-    nons = np.zeros_like(mods)
-    for i, (mf, warns) in enumerate(mod_fits):
-        mods[i] = np.mean(mf.samples['modulator'])
-    return mods
-
-def plot_model_comparison(loss, weight, weightsums, axs=None,
-                          keys=('pure', 'modulated', 'modulated_cv',
-                                'second', 'second_cv'),
+def plot_model_comparison(loss, metrics, axs=None,
+                          keys=('pure', 'modulated_cv',
+                                'second_cv'),
                           fwid=1.5, n_boots=1000, eps=.001,
-                          labels=None):
+                          labels=None, monkey_offset=.1,
+                          color=None, overall_offset=.3,
+                          make_scale_bars=True, monkey_name=''):
     if labels is None:
-        labels = {'second':'nonlinear'}
+        labels = {'second':'nonlinear', 'second_cv':'nonlinear',
+                  'modulated_cv':'modulated'}
     if axs is None:
-        f = plt.figure(figsize=(fwid, 2*fwid))
-        ax_l = f.add_subplot(2, 1, 1)
-        ax_ws = f.add_subplot(2, 1, 2)
-    else:
-        ax_l, ax_ws = axs
+        f, axs = plt.figure(6, 1, figsize=(fwid, 6*fwid))
+    ax_l, ax_sacc, ax_prior, ax_tsacc, ax_tprior = axs
     ax_vals = []
     ax_labels = []
     cols = []
@@ -528,39 +552,65 @@ def plot_model_comparison(loss, weight, weightsums, axs=None,
     for i, k in enumerate(keys[::-1]):
         frac_b = u.bootstrap_list(np.array(loss[k]), lambda x: np.mean(x < 1),
                                   n=n_boots)
-        l = gpl.plot_horiz_conf_interval(i, frac_b, ax_l)
-        col = l[0].get_color()
-        cols.append(col)
-        vp_seq.append(weight[k])
+        l = gpl.plot_horiz_conf_interval(i + monkey_offset,
+                                         frac_b, ax_l, color=color)
         ax_vals.append(i)
         if labels.get(k, None) is None:
             ax_labels.append(k)
         else:
             ax_labels.append(labels[k])
-    print(np.sum(np.logical_or(np.array(loss['second']) < eps,
-                               np.array(loss['third']) < eps)))
-    subset = np.logical_and(np.logical_or(np.array(loss['second']) < eps,
-                                          np.array(loss['third']) < eps),
-                            np.array(loss['modulated']) > 1)
-    print('{} / {}'.format(np.sum(subset), len(subset)))
-    vps = gpl.violinplot(vp_seq, positions=ax_vals, vert=False, ax=ax_ws,
-                         showextrema=False, showmedians=True)
+    ax_l.set_ylim([min(ax_vals) - overall_offset,
+                   max(ax_vals) + overall_offset])
     ax_l.set_yticks(ax_vals)
     ax_l.set_yticklabels(ax_labels)
-    ax_ws.set_yticks(ax_vals)
-    ax_ws.set_yticklabels(ax_labels)
-
-    ax_l.set_xlim([0, .9])
-    # gpl.clean_plot_bottom(ax_l)
     gpl.clean_plot(ax_l, 1, ticks=False)
-    gpl.make_xaxis_scale_bar(ax_l, magnitude=.75, double=False,
-                             label='fraction best fit',
-                             text_buff=.23)
+    if make_scale_bars:
+        gpl.make_xaxis_scale_bar(ax_l, magnitude=.6, double=False,
+                                 label='fraction best fit',
+                                 text_buff=.25)
+
+    ax_sacc.hist(metrics['sacc_nonl'][:,0], histtype='step', color=color)
+    ax_prior.hist(metrics['prior_nonl'][:,0], histtype='step', color=color)
+    gpl.print_mean_conf95(metrics['sacc_nonl'][:, 0], monkey_name,
+                          'general saccade magnitude',
+                          func=lambda x: np.mean(np.abs(x)))
+    gpl.print_mean_conf95(metrics['prior_nonl'][:, 0], monkey_name,
+                          'general priority magnitude',
+                          func=lambda x: np.mean(np.abs(x)))
+    gpl.clean_plot(ax_sacc, 0)
+    gpl.clean_plot(ax_prior, 1)
+    if make_scale_bars:
+        gpl.make_yaxis_scale_bar(ax_sacc, magnitude=5, double=False,
+                                 label='neurons', text_buff=.54)
+        xmag = .4
+        xbuff = .3
+        gpl.make_xaxis_scale_bar(ax_sacc, magnitude=xmag, double=True,
+                                 label='saccade\nselectivity', text_buff=xbuff)
+        gpl.make_xaxis_scale_bar(ax_prior, magnitude=xmag, double=True,
+                                 label='priority\nselectivity', text_buff=xbuff)
+
+    ax_tsacc.plot(metrics['sacc_nonl'][:, 1], metrics['sacc_nonl'][:, 2], 'o',
+                  color=color)
+    gpl.clean_plot(ax_tsacc, 0)
     
-    gpl.clean_plot(ax_ws, 1, horiz=True, ticks=False)
-    gpl.make_xaxis_scale_bar(ax_ws, magnitude=.5, double=False,
-                             label='relative probability', text_buff=.23)
-    # gpl.clean_plot_bottom(ax_ws)
+    ax_tprior.plot(metrics['prior_nonl'][:, 1], metrics['prior_nonl'][:, 2], 'o',
+                  color=color)
+    gpl.clean_plot(ax_tprior, 0)
+    if make_scale_bars:
+        mag = .4
+        xbuff = .3
+        ybuff = .5
+        gpl.make_xaxis_scale_bar(ax_tsacc, magnitude=mag, double=True,
+                                 label='PLT', text_buff=xbuff)
+        gpl.make_xaxis_scale_bar(ax_tprior, magnitude=mag, double=True,
+                                 label='PLT', text_buff=xbuff)
+        gpl.make_yaxis_scale_bar(ax_tsacc, magnitude=mag, double=True,
+                                 label='sDMST', text_buff=ybuff)
+        gpl.make_yaxis_scale_bar(ax_tprior, magnitude=mag, double=True,
+                                 label='', text_buff=ybuff)
+        ax_tsacc.set_title('saccade', loc='left')
+        ax_tprior.set_title('priority', loc='left')
+    return axs
         
 def get_first_saccade_prob_bs(data, *args, n_boots=1000, remove_errs=True,
                               errfield='TrialError', angular_separation=180,

@@ -612,18 +612,19 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     if data is None:
         data = {}
 
-    fsize = (4, 2.5)
+    fsize = (4.5, 3)
     f = plt.figure(figsize=fsize)
     gs = f.add_gridspec(100, 100)
 
-    loss_m1 = gs[:40, 50:65]
-    prob_m1 = gs[60:, 50:70]
-    
-    loss_m2 = gs[:40, 85:]
-    prob_m2 = gs[60:, 85:]
+    loss_gs = gs[:40, 50:62]
+    sacc_gs = gs[:40, 71:83]
+    prior_gs = gs[:40, 88:]
 
-    glm_axs = {'Neville':(loss_m1, prob_m1),
-               'Rufus':(loss_m2, prob_m2)}
+    sacc_task_gs = gs[70:, 50:70]
+    prior_task_gs = gs[70:, 80:]
+
+    glm_axs = (loss_gs, sacc_gs, prior_gs,
+               sacc_task_gs, prior_task_gs)
     
     # colors
     sdms_sc = params.getcolor('sdms_sacc_color')
@@ -684,15 +685,31 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
         data['cd'] = glm_dat
 
     # find good way to plot model comparison result
-    
+    monkey_offsets = {'Neville':.1,
+                      'Rufus':-.1}
     if 'cd' in gen_panels:
         neurs = data['cd']
+        loss_ax = f.add_subplot(loss_gs)
+        sacc_ax = f.add_subplot(sacc_gs)
+        prior_ax = f.add_subplot(prior_gs, sharey=sacc_ax, sharex=sacc_ax)
+        sacc_task_ax = f.add_subplot(sacc_task_gs, aspect='equal')
+        prior_task_ax = f.add_subplot(prior_task_gs, aspect='equal',
+                                      sharey=sacc_task_ax,
+                                      sharex=sacc_task_ax)
+        axs = (loss_ax, sacc_ax, prior_ax,
+               sacc_task_ax, prior_task_ax)
+        make_scale_bars = True
         for m, d_both in neurs.items():
-            axs_gs = glm_axs[m]
-            axs = list(f.add_subplot(ax) for ax in axs_gs)
             fits_m, comps_m, labs_m = d_both
-            out = pl.summarize_model_comparison(fits_m, comps_m, labs_m)
-            pl.plot_model_comparison(*out[:-1], axs=axs)
+            out = pl.summarize_model_comparison(fits_m, comps_m, labs_m,
+                                                monkey_name=m)
+            m_loss, _, _, m_metrics = out
+            pl.plot_model_comparison(m_loss, m_metrics, axs=axs,
+                                     color=monkey_colors[m],
+                                     monkey_offset=monkey_offsets[m],
+                                     make_scale_bars=make_scale_bars,
+                                     monkey_name=m)
+            make_scale_bars = False
     if bf is None:
         bf = params.get('basefolder')
     fname = os.path.join(bf, 'fig2a-py.svg')
