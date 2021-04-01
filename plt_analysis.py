@@ -326,36 +326,37 @@ def fit_comparison_models(data, conds, labels, model_path=None,
     out_null = fit_stan_model(data, conds, labels, model_path, only_labels=(),
                               **fit_params)
 
-    out_null2 = fit_stan_model(data, conds, labels, model_path_modu_cv,
+    out_null2 = fit_stan_model(data, conds, labels, model_path_modu_nb_cv,
                                only_labels=(), **fit_params)
 
     pure_conds = get_pure_conds(labels)
     out_pure = fit_stan_model(data, conds, labels, model_path,
                               only_labels=pure_conds, **fit_params)
+    pure_cv_conds = get_nth_conds(labels, 1)
+    out_pure_cv = fit_stan_model(data, conds, labels, model_path_cv,
+                                 only_labels=pure_cv_conds)
 
-    # modulated_conds = list(filter(lambda x: len(x) == 1,
-    #                               labels))
     out_mod = fit_stan_model(data, conds, labels, model_path_modu,
                              only_labels=pure_conds, **fit_params)
-
     out_mod_cv = fit_stan_model(data, conds, labels, model_path_modu_cv,
                                 only_labels=pure_conds, **fit_params)
 
     second_conds = get_nth_conds(labels, 2)
     out_sec = fit_stan_model(data, conds, labels, model_path,
                              only_labels=second_conds)
-
     out_sec_cv = fit_stan_model(data, conds, labels, model_path_cv,
                                 only_labels=second_conds)
 
     out_third = fit_stan_model(data, conds, labels, model_path, **fit_params)
 
-    models = {'pure':out_pure[:2], 'modulated':out_mod[:2],
+    models = {'pure':out_pure[:2], 'pure_cv':out_pure_cv[:2],
+              'modulated':out_mod[:2],
               'second':out_sec[:2], 'third':out_third[:2],
               'null':out_null[:2], 'null2':out_null2[:2],
               'modulated_cv':out_mod_cv[:2],
               'second_cv':out_sec_cv[:2]}
-    models_ar = {'pure':out_pure[2], 'modulated':out_mod[2],
+    models_ar = {'pure':out_pure[2], 'pure_cv':out_pure_cv[2],
+                 'modulated':out_mod[2],
                  'second':out_sec[2], 'third':out_third[2],
                  'null':out_null[2], 'null2':out_null2[2],
                  'modulated_cv':out_mod_cv[2],
