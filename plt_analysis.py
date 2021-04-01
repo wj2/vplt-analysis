@@ -326,7 +326,7 @@ def fit_comparison_models(data, conds, labels, model_path=None,
     out_null = fit_stan_model(data, conds, labels, model_path, only_labels=(),
                               **fit_params)
 
-    out_null2 = fit_stan_model(data, conds, labels, model_path_modu_nb_cv,
+    out_null2 = fit_stan_model(data, conds, labels, model_path_modu_cv,
                                only_labels=(), **fit_params)
 
     pure_conds = get_pure_conds(labels)
