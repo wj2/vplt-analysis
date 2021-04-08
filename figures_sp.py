@@ -671,16 +671,17 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     adapt_delta = params.getfloat('adapt_delta')
     req_trials = params.getint('min_trials_lm')
     mf = d.first_sacc_func
-    
+
+    max_fit = 2
     if 'cd' not in data.keys():
         glm_dat = {}
         for m, mdata in exper_data.items():
-            out_both = pl.compare_models(mdata[0], time_cent, time_wid, mf,
-                                         dfunc_group_both[m], glm_shape,
-                                         glm_labels_both, av_only=av_only,
-                                         adapt_delta=adapt_delta,
-                                         min_trials=req_trials,
-                                         max_fit=None)
+            out_both = pl.compare_models_pop(mdata[0], time_cent, time_wid, mf,
+                                             dfunc_group_both[m], glm_shape,
+                                             glm_labels_both, av_only=av_only,
+                                             adapt_delta=adapt_delta,
+                                             min_trials=req_trials,
+                                             max_fit=max_fit)
             glm_dat[m] = out_both
         data['cd'] = glm_dat
 

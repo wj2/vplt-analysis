@@ -271,23 +271,39 @@ def _get_label_filter(labels, label_set):
         mask = np.array(list(l in label_set for l in labels))
     return mask       
 
+
+indiv_prior = dict(beta_var=1, sigma_var=1, modul_var=1)
+pop_prior = dict(beta_mean_var=1, beta_var_var=1,
+                 sigma_mean_mean=1, sigma_mean_var=1,
+                 sigma_var_mean=1, sigma_var_var=1,
+                 modul_mean_var=1, modul_var_var=1)
 def fit_stan_model(data, conds, labels, model_path, only_labels=None,
                    sdmst_num=(('task', 0),), stan_iters=2000, stan_chains=4,
-                   sigma_var=1, beta_var=1, modul_var=1, arviz=na.glm_arviz,
-                   adapt_delta=.8, max_treedepth=10, reduce_fit=True,
-                   **stan_params):
+                   arviz=na.glm_arviz, adapt_delta=.8, max_treedepth=10,
+                   reduce_fit=True, neur_inds=None, pop=False, **stan_params):
     data = np.squeeze(data)
     conds = np.squeeze(conds)
     sdmst_ind = list(labels).index(sdmst_num)
     task_var = conds[:, sdmst_ind]
     mask = _get_label_filter(labels, only_labels)
     conds = conds[..., mask]
+    if neur_inds is None:
+        neur_inds = np.ones(data.shape[0], dtype=int)
+    if pop:
+        prior_dict = pop_prior
+        arviz = na.glm_pop_arviz
+    else:
+        prior_dict = indiv_prior
     if conds.shape[1] == 0:
         conds = np.zeros((len(data), 1))
     sm = pickle.load(open(model_path, 'rb'))
-    stan_data = dict(N=data.shape[0], K=conds.shape[1], x=conds,
-                     y=data, beta_var=beta_var, sigma_var=sigma_var,
-                     context=task_var, modul_var=modul_var)
+    if pop:
+        stan_data = dict(T=data.shape[0], N=max(neur_inds), K=conds.shape[1],
+                         x=conds, y=data, context=task_var, neur_inds=neur_inds)
+    else:
+        stan_data = dict(N=data.shape[0], K=conds.shape[1], x=conds, y=data,
+                         context=task_var)
+    stan_data.update(prior_dict)
     control = dict(adapt_delta=adapt_delta, max_treedepth=max_treedepth)
     fit = sm.sampling(data=stan_data, iter=stan_iters, chains=stan_chains,
                       control=control, **stan_params)
@@ -313,41 +329,53 @@ def get_nth_conds(labels, nth):
 
 def fit_comparison_models(data, conds, labels, model_path=None,
                           model_path_modu=None, model_path_cv=None,
-                          model_path_modu_cv=None, **fit_params):
-    if model_path is None:
-        model_path = na.stan_file_glm_nomean
-    if model_path_modu is None:
-        model_path_modu = na.stan_file_glm_modu_nomean
-    if model_path_modu_cv is None:
-        model_path_modu_cv = na.stan_file_glm_modu_nomean_cv
-    if model_path_cv is None:
-        model_path_cv = na.stan_file_glm_nomean_cv
-
+                          model_path_modu_cv=None, pop=False,
+                          **fit_params):
+    if pop:
+        if model_path is None:
+            model_path = na.stan_file_glm_nomean_pop
+        if model_path_modu is None:
+            model_path_modu = na.stan_file_glm_modu_nomean_pop
+        if model_path_modu_cv is None:
+            model_path_modu_cv = na.stan_file_glm_modu_nomean_cv_pop
+        if model_path_cv is None:
+            model_path_cv = na.stan_file_glm_nomean_cv_pop
+    else:        
+        if model_path is None:
+            model_path = na.stan_file_glm_nomean
+        if model_path_modu is None:
+            model_path_modu = na.stan_file_glm_modu_nomean
+        if model_path_modu_cv is None:
+            model_path_modu_cv = na.stan_file_glm_modu_nomean_cv
+        if model_path_cv is None:
+            model_path_cv = na.stan_file_glm_nomean_cv
+            
     out_null = fit_stan_model(data, conds, labels, model_path, only_labels=(),
-                              **fit_params)
+                              pop=pop, **fit_params)
 
     out_null2 = fit_stan_model(data, conds, labels, model_path_modu_cv,
-                               only_labels=(), **fit_params)
+                               pop=pop, only_labels=(), **fit_params)
 
     pure_conds = get_pure_conds(labels)
     out_pure = fit_stan_model(data, conds, labels, model_path,
-                              only_labels=pure_conds, **fit_params)
+                              pop=pop, only_labels=pure_conds, **fit_params)
     pure_cv_conds = get_nth_conds(labels, 1)
     out_pure_cv = fit_stan_model(data, conds, labels, model_path_cv,
-                                 only_labels=pure_cv_conds)
+                                 pop=pop, only_labels=pure_cv_conds)
 
     out_mod = fit_stan_model(data, conds, labels, model_path_modu,
-                             only_labels=pure_conds, **fit_params)
+                             pop=pop, only_labels=pure_conds, **fit_params)
     out_mod_cv = fit_stan_model(data, conds, labels, model_path_modu_cv,
-                                only_labels=pure_conds, **fit_params)
+                                pop=pop, only_labels=pure_conds, **fit_params)
 
     second_conds = get_nth_conds(labels, 2)
     out_sec = fit_stan_model(data, conds, labels, model_path,
-                             only_labels=second_conds)
+                             pop=pop, only_labels=second_conds)
     out_sec_cv = fit_stan_model(data, conds, labels, model_path_cv,
-                                only_labels=second_conds)
+                                pop=pop, only_labels=second_conds)
 
-    out_third = fit_stan_model(data, conds, labels, model_path, **fit_params)
+    out_third = fit_stan_model(data, conds, labels, model_path,
+                               pop=pop, **fit_params)
 
     models = {'pure':out_pure[:2], 'pure_cv':out_pure_cv[:2],
               'modulated':out_mod[:2],
@@ -363,9 +391,9 @@ def fit_comparison_models(data, conds, labels, model_path=None,
                  'second_cv':out_sec_cv[2]}
     return models, models_ar
 
-def compare_models(data, tc, tw, marker_func, constr_funcs, constr_inds, labels,
-                   av_only=False, store_comp=True, max_fit=None, min_trials=5,
-                   **fit_params):
+def compare_models_single(data, tc, tw, marker_func, constr_funcs, constr_inds,
+                          labels, av_only=False, store_comp=True, max_fit=None,
+                          min_trials=5, **fit_params):
     out = format_data_stan_models(data, tc, tw, marker_func, constr_funcs,
                                   constr_inds, labels, min_trials=min_trials)
     glm_dat, glm_cond, glm_lab, xs = out
@@ -385,6 +413,32 @@ def compare_models(data, tc, tw, marker_func, constr_funcs, constr_inds, labels,
             break
     return fits_all, comp_all, glm_lab
 
+def compare_models_pop(data, tc, tw, marker_func, constr_funcs, constr_inds,
+                          labels, av_only=False, store_comp=True, max_fit=None,
+                          min_trials=5, **fit_params):
+    out = format_data_stan_models(data, tc, tw, marker_func, constr_funcs,
+                                  constr_inds, labels, min_trials=min_trials)
+    glm_dat, glm_cond, glm_lab, xs = out
+    comp_all = []
+    fits_all = []
+    if max_fit is not None:
+        glm_dat = glm_dat[:max_fit]
+        glm_cond = glm_cond[:max_fit]
+    n_neurs = len(glm_dat)
+    ind_list = list(np.ones(d.shape[2], dtype=int)*(i + 1)
+                    for i, d in enumerate(glm_dat))
+    neur_inds = np.concatenate(ind_list, axis=0)
+    gdata_all = np.squeeze(np.concatenate(glm_dat, axis=2))
+    gconds_all = np.squeeze(np.concatenate(glm_cond, axis=1))
+    fit, comp = fit_comparison_models(gdata_all, gconds_all, glm_lab,
+                                      neur_inds=neur_inds, pop=True,
+                                      **fit_params)
+    if av_only:
+        fit = None
+    if store_comp:
+        comp = az.compare(comp)
+    return fit, comp, glm_lab
+
 def _get_rel_loss(cf, model_name, deviance='d_loo', deviance_uncertainty='dse'):
     pl = cf.loc[model_name, deviance]
     if pl > 0:
@@ -403,10 +457,10 @@ def get_label_diff(params, k1, k2, labels, samples_key='beta'):
 
 def summarize_model_comparison(
         fits, comps, labels,
-        model_names=('pure', 'modulated', 'modulated_cv',
+        model_names=('pure', 'pure_cv', 'modulated', 'modulated_cv',
                      'second', 'second_cv', 'third'),
         n_boots=2000, ct=np.median, null_keys=('null', 'null2'),
-        err_thr=1, monkey_name=''):
+        err_thr=1, monkey_name='', verbose=False):
     fits_arr = np.array(fits)
     comps_arr = np.zeros(len(comps), dtype=object)
     comps_arr[:] = comps
@@ -436,12 +490,14 @@ def summarize_model_comparison(
         if _get_rel_loss(cf, 'null') < err_thr:
             null_best = null_best + 1
         if np.all(null_loss > err_thr):
-            print('---')
-            print(_get_rel_loss(cf, 'pure'))
-            print(_get_rel_loss(cf, 'modulated'))
-            print(_get_rel_loss(cf, 'modulated_cv'))
-            print(_get_rel_loss(cf, 'second'))
-            print(_get_rel_loss(cf, 'second_cv'))
+            if verbose:
+                print('---')
+                print('pure   ', _get_rel_loss(cf, 'pure'))
+                print('pure cv', _get_rel_loss(cf, 'pure_cv'))
+                print('mod    ', _get_rel_loss(cf, 'modulated'))
+                print('mod cv ', _get_rel_loss(cf, 'modulated_cv'))
+                print('nonl   ', _get_rel_loss(cf, 'second'))
+                print('nonl cv', _get_rel_loss(cf, 'second_cv'))
             mods_i = fits_arr[i]['modulated_cv'][0].samples['modulator']
             sigs_modu_i = fits_arr[i]['modulated_cv'][0].samples['sigma']
             sigs_nonl_i = fits_arr[i]['second_cv'][0].samples['sigma']
@@ -520,9 +576,6 @@ def summarize_model_comparison(
     for mn in model_names:
         w_b = u.bootstrap_list(np.array(out_weight[mn]), ct, n=n_boots)
         out_weightsums[mn] = w_b
-        desc_string = '{} model best fit'.format(mn)
-        gpl.print_mean_conf95(out_loss[mn], monkey_name, desc_string,
-                              func=lambda x: np.nanmean(x < 1))
 
     out_metrics = {'mods':ct(np.array(out_mods), axis=1),
                    'mean_fr':np.array(mean_deltas),
@@ -534,14 +587,16 @@ def summarize_model_comparison(
     return out_loss, out_weight, out_weightsums, out_metrics
 
 def plot_model_comparison(loss, metrics, axs=None,
-                          keys=('pure', 'modulated_cv',
+                          keys=('pure_cv', 'modulated_cv',
                                 'second_cv'),
                           fwid=1.5, n_boots=1000, eps=.001,
                           labels=None, monkey_offset=.1,
                           color=None, overall_offset=.3,
+                          err_thr=0,
                           make_scale_bars=True, monkey_name=''):
     if labels is None:
-        labels = {'second':'nonlinear', 'second_cv':'nonlinear',
+        labels = {'pure_cv':'pure', 'second':'nonlinear',
+                  'second_cv':'nonlinear',
                   'modulated_cv':'modulated'}
     if axs is None:
         f, axs = plt.figure(6, 1, figsize=(fwid, 6*fwid))
@@ -551,8 +606,13 @@ def plot_model_comparison(loss, metrics, axs=None,
     cols = []
     vp_seq = []
     for i, k in enumerate(keys[::-1]):
-        frac_b = u.bootstrap_list(np.array(loss[k]), lambda x: np.mean(x < 1),
+        frac_b = u.bootstrap_list(np.array(loss[k]),
+                                  lambda x: np.mean(x <= err_thr),
                                   n=n_boots)
+        desc_string = '{} model best fit'.format(k)
+        gpl.print_mean_conf95(loss[k], monkey_name, desc_string,
+                              func=lambda x: np.nanmean(x <= err_thr))
+
         l = gpl.plot_horiz_conf_interval(i + monkey_offset,
                                          frac_b, ax_l, color=color)
         ax_vals.append(i)
@@ -578,6 +638,10 @@ def plot_model_comparison(loss, metrics, axs=None,
     gpl.print_mean_conf95(metrics['prior_nonl'][:, 0], monkey_name,
                           'general priority magnitude',
                           func=lambda x: np.mean(np.abs(x)))
+    diff = (np.abs(metrics['sacc_nonl'][:, 0])
+            - np.abs(metrics['prior_nonl'][:, 0]))
+    gpl.print_mean_conf95(diff, monkey_name, 'diff magnitude',
+                          func=np.nanmean)
     gpl.clean_plot(ax_sacc, 0)
     gpl.clean_plot(ax_prior, 1)
     if make_scale_bars:
