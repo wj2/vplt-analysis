@@ -661,8 +661,12 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
                                    d.novin_saccin_n, d.novin_saccout_n,
                                    d.famin_saccin_n, d.famin_saccout_n)
 
-    glm_shape = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+    # swap priority
+    glm_shape = ((0, 1, 0), (0, 1, 1), (0, 0, 0), (0, 0, 1),
                  (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
+    # original
+    # glm_shape = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+    #              (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
     glm_labels_both = ('task', 'priority', 'sacc')
 
     time_cent = params.getfloat('time_cent')
@@ -676,7 +680,7 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     if 'cd' not in data.keys():
         glm_dat = {}
         for m, mdata in exper_data.items():
-            out_both = pl.compare_models_pop(mdata[0], time_cent, time_wid, mf,
+            out_both = pl.compare_models_single(mdata[0], time_cent, time_wid, mf,
                                              dfunc_group_both[m], glm_shape,
                                              glm_labels_both, av_only=av_only,
                                              adapt_delta=adapt_delta,

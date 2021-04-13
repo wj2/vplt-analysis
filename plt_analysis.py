@@ -280,13 +280,19 @@ pop_prior = dict(beta_mean_var=1, beta_var_var=1,
 def fit_stan_model(data, conds, labels, model_path, only_labels=None,
                    sdmst_num=(('task', 0),), stan_iters=2000, stan_chains=4,
                    arviz=na.glm_arviz, adapt_delta=.8, max_treedepth=10,
-                   reduce_fit=True, neur_inds=None, pop=False, **stan_params):
+                   reduce_fit=False, neur_inds=None, pop=False, **stan_params):
     data = np.squeeze(data)
     conds = np.squeeze(conds)
     sdmst_ind = list(labels).index(sdmst_num)
-    task_var = conds[:, sdmst_ind]
+    print(np.unique(conds[:, sdmst_ind]))
+    task_var = conds[:, sdmst_ind].astype(int)
+    print(np.max(np.abs(conds[:, sdmst_ind] - task_var)))
+    print(task_var)
+    print(conds.shape)
     mask = _get_label_filter(labels, only_labels)
     conds = conds[..., mask]
+    print(conds.shape)
+    print(data.shape)
     if neur_inds is None:
         neur_inds = np.ones(data.shape[0], dtype=int)
     if pop:
