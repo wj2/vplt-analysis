@@ -600,7 +600,8 @@ def figure2(data=None, gen_panels=None, exper_data=None,
 
 def figure2a(data=None, gen_panels=None, exper_data=None,
              monkey_paths=pl.monkey_paths, config_file=config_path,
-             rand_eg=False, bf=None, reverse_priority=False):
+             rand_eg=False, bf=None, reverse_priority=False,
+             max_fit=np.inf):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -675,7 +676,6 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     req_trials = params.getint('min_trials_lm')
     mf = d.first_sacc_func
 
-    max_fit = 2
     if 'cd' not in data.keys():
         glm_dat = {}
         for m, mdata in exper_data.items():
