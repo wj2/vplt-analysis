@@ -46,6 +46,100 @@ def _make_fixation_mapping(data, sacc_targ='saccade_targ'):
     ax_map = {o:i for i, o in enumerate(options)}
     return ax_map
 
+def _nth_trans(n):
+    def func(targs, pattern):
+        out = np.zeros(len(targs), dtype=bool)
+        for i, t in enumerate(targs):
+            out[i] = np.logical_and(t[n] == pattern[0],
+                                    t[n+1] == pattern[1])
+        return out
+    return func
+
+def get_nth_sacctime(n, fieldname):
+    def func(trls):
+        ts = np.array(list(x[n] for x in trls[fieldname]))
+        return ts
+    return func
+
+def _merge_sacc_dicts(spks_ds):
+    for i, (k, v) in enumerate(spks_ds.items()):
+        if i == 0:
+            total_spks = list({} for _ in range(len(v)))
+        for j, cond_j in enumerate(v):
+            for k2, v2 in cond_j.items():
+                curr = total_spks[j].get(k2, None)
+                if curr is None:
+                    total_spks[j][k2] = v2
+                else:
+                    total_spks[j][k2] = np.concatenate((curr, v2), axis=0)
+    return total_spks
+
+def get_nsaccs(trs, beg_field):
+    begs = trs[beg_field]
+    out = np.zeros(len(begs), dtype=int)
+    for i, b in enumerate(begs):
+        try:
+            out[i] = len(b)
+        except TypeError:
+            out[i] = 0
+    return out
+
+def get_staymove_saccades(trs, use_conds, start_time, end_time, binsize,
+                          binstep, min_spks=1, zscore=False,
+                          sacc_targ='saccade_targ', ang_sep=180,
+                          beg_times='saccade_begs', **kwargs):
+    n_saccs = get_nsaccs(trs, beg_times)
+    max_saccs = np.max(n_saccs)
+    spks = {}
+    for i in range(1, max_saccs):
+        mask = n_saccs > i 
+        trs_m = trs[mask]
+        sacc_trans_right = u.make_trial_constraint_func(('trial_type',
+                                                         'angular_separation',
+                                                         'TrialError',
+                                                         sacc_targ),
+                                                        (use_conds, ang_sep, 0,
+                                                         (b'l', b'r')),
+                                                        (np.isin, np.equal,
+                                                         np.equal,
+                                                        _nth_trans(i - 1)))
+        sacc_trans_left = u.make_trial_constraint_func(('trial_type',
+                                                        'angular_separation',
+                                                        'TrialError', sacc_targ),
+                                                        (use_conds, ang_sep, 0,
+                                                         (b'r', b'l')),
+                                                        (np.isin, np.equal,
+                                                         np.equal,
+                                                        _nth_trans(i - 1)))
+        sacc_stay_right = u.make_trial_constraint_func(('trial_type',
+                                                        'angular_separation',
+                                                         'TrialError', sacc_targ),
+                                                        (use_conds, ang_sep, 0,
+                                                         (b'r', b'r')),
+                                                        (np.isin, np.equal,
+                                                         np.equal,
+                                                        _nth_trans(i - 1)))
+        sacc_stay_left = u.make_trial_constraint_func(('trial_type',
+                                                       'angular_separation',
+                                                       'TrialError', sacc_targ),
+                                                        (use_conds, ang_sep, 0,
+                                                         (b'l', b'l')),
+                                                        (np.isin, np.equal,
+                                                         np.equal,
+                                                        _nth_trans(i - 1)))
+        mf = get_nth_sacctime(i, beg_times)
+        constr_funcs = (sacc_trans_left, sacc_trans_right, sacc_stay_left,
+                        sacc_stay_right)
+        marker_funcs = (mf,)*4
+        out = na.organize_spiking_data(trs_m, constr_funcs, marker_funcs,
+                                       start_time, end_time, binsize, binstep,
+                                       min_spks=min_spks, zscore=zscore,
+                                       **kwargs)
+        spks[i], xs = out
+    spks = _merge_sacc_dicts(spks)
+    return spks, xs        
+        
+
 def make_saccade_tree(trs, tree_depth=5, discard_short=False,
                       sacc_targ='saccade_targ', sacc_len='saccade_lens',
                       ax_map=None):
@@ -280,19 +374,13 @@ pop_prior = dict(beta_mean_var=1, beta_var_var=1,
 def fit_stan_model(data, conds, labels, model_path, only_labels=None,
                    sdmst_num=(('task', 0),), stan_iters=2000, stan_chains=4,
                    arviz=na.glm_arviz, adapt_delta=.8, max_treedepth=10,
-                   reduce_fit=False, neur_inds=None, pop=False, **stan_params):
+                   reduce_fit=True, neur_inds=None, pop=False, **stan_params):
     data = np.squeeze(data)
     conds = np.squeeze(conds)
     sdmst_ind = list(labels).index(sdmst_num)
-    print(np.unique(conds[:, sdmst_ind]))
     task_var = conds[:, sdmst_ind].astype(int)
-    print(np.max(np.abs(conds[:, sdmst_ind] - task_var)))
-    print(task_var)
-    print(conds.shape)
     mask = _get_label_filter(labels, only_labels)
     conds = conds[..., mask]
-    print(conds.shape)
-    print(data.shape)
     if neur_inds is None:
         neur_inds = np.ones(data.shape[0], dtype=int)
     if pop:
@@ -466,7 +554,7 @@ def summarize_model_comparison(
         model_names=('pure', 'pure_cv', 'modulated', 'modulated_cv',
                      'second', 'second_cv', 'third'),
         n_boots=2000, ct=np.median, null_keys=('null', 'null2'),
-        err_thr=1, monkey_name='', verbose=False):
+        err_thr=1, monkey_name='', verbose=False, swap_prior=False):
     fits_arr = np.array(fits)
     comps_arr = np.zeros(len(comps), dtype=object)
     comps_arr[:] = comps
@@ -1633,12 +1721,11 @@ def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
 def plot_dpca_kernels(dpca, xs, axs_keys, dim_dict=0, arr_labels=None,
                       signif_level=.01, color_dict=None, style_dict=None,
                       signif_heights=None, signif_height_default=5,
-                      task_ind=None):
+                      task_ind=None, avg_ax=None):
     kerns, _, scores, shuff_scores, ev = dpca
     if signif_heights is None:
         signif_heights = {k[0]:signif_height_default for k in axs_keys}
     for (k, ax) in axs_keys:
-        print(kerns['t'].shape)
         dim = dim_dict[k]
         if k in shuff_scores.keys():
             num_shuffs = len(shuff_scores[k])
@@ -1655,9 +1742,14 @@ def plot_dpca_kernels(dpca, xs, axs_keys, dim_dict=0, arr_labels=None,
             kern = kern[task_ind]
             kern2 = kern2[task_ind]
         sig = pval < signif_level
+        if avg_ax is not None:
+            kern = np.mean(kern, axis=avg_ax[k])
+            kern2 = np.mean(kern2, axis=avg_ax[k])
+        if len(kern.shape) == 1:
+            kern = np.expand_dims(kern, 0)
+            kern2 = np.expand_dims(kern2, 0)
         ax_shape = kern.shape[:-1]
         ind_combs = itertools.product(*(range(x) for x in ax_shape))
-        
         for ic in ind_combs:
             k1 = kern[ic]
             k2 = kern2[ic]
@@ -1676,7 +1768,7 @@ def plot_dpca_kernels(dpca, xs, axs_keys, dim_dict=0, arr_labels=None,
         # ax.plot(xs_sig, ys_sig, 'o', color=l[0].get_color())
 
 def _compute_latency_across_dim(scores, shuffs, xs, signif_level=.01,
-                                n_consecutive=5):
+                                n_consecutive=10):
         num_shuffs = len(shuffs)
         latencies = np.zeros(scores.shape[0])
         for dim in range(scores.shape[0]):
@@ -1700,14 +1792,14 @@ def _compute_latency_across_dim(scores, shuffs, xs, signif_level=.01,
         return min_latency            
             
 def compute_dpca_latencies(dpcas, xs, key, signif_level=.01,
-                           n_consecutive=5):
+                           n_consecutive=10):
     latencies = np.zeros(len(dpcas))
     for i, dpca in enumerate(dpcas):
         kerns, _, scores, shuff_scores, ev = dpca
         latencies[i] = _compute_latency_across_dim(scores[key],
                                                    shuff_scores[key], xs,
                                                    signif_level=signif_level,
-                                                   n_consecutive=n_consecutive)        
+                                                   n_consecutive=n_consecutive)  
     return latencies
 
 def compute_dpca_ev(dpcas):

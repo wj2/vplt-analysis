@@ -600,7 +600,7 @@ def figure2(data=None, gen_panels=None, exper_data=None,
 
 def figure2a(data=None, gen_panels=None, exper_data=None,
              monkey_paths=pl.monkey_paths, config_file=config_path,
-             rand_eg=False, bf=None):
+             rand_eg=False, bf=None, reverse_priority=False):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -654,19 +654,18 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
                                  d.saccout_nonmatch_sdms,
                                  d.novin_saccin, d.novin_saccout,
                                  d.famin_saccin, d.famin_saccout)
-    dfunc_group_both['Neville'] = (d.saccin_match_sdms_n,
-                                   d.saccout_match_g_sdms_n,
+    dfunc_group_both['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
                                    d.saccin_nonmatch_g_sdms_n,
                                    d.saccout_nonmatch_sdms_n,
                                    d.novin_saccin_n, d.novin_saccout_n,
                                    d.famin_saccin_n, d.famin_saccout_n)
+    if reverse_priority:
+        glm_shape = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+                     (1, 1, 0), (1, 1, 1), (1, 0, 0), (1, 0, 1))
+    else:
+        glm_shape = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+                     (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
 
-    # swap priority
-    glm_shape = ((0, 1, 0), (0, 1, 1), (0, 0, 0), (0, 0, 1),
-                 (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
-    # original
-    # glm_shape = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
-    #              (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
     glm_labels_both = ('task', 'priority', 'sacc')
 
     time_cent = params.getfloat('time_cent')
@@ -1055,7 +1054,8 @@ def figure3(data=None, gen_panels=None, exper_data=None,
     return data
 
 def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
-            monkey_paths=pl.monkey_paths, config_file=config_path, bf=None):
+            monkey_paths=pl.monkey_paths, config_file=config_path,
+            reverse_priority=False, bf=None):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -1142,8 +1142,12 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                    d.saccout_nonmatch_sdms_n,
                                    d.novin_saccin_n, d.novin_saccout_n,
                                    d.famin_saccin_n, d.famin_saccout_n)
-    dfunc_pts = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
-                 (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
+    if reverse_priority:
+        dfunc_pts = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+                     (1, 1, 0), (1, 1, 1), (1, 0, 0), (1, 0, 1))
+    else:
+        dfunc_pts = ((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+                     (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1))
     cond_labels_comb = ('bpst')
 
     if 'cd' not in data.keys() and ('c' in gen_panels or 'd' in gen_panels
@@ -1174,7 +1178,11 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                  ((pro_s, anti_s), (pro_s, anti_s)))),
                   'pt':np.array((((pro_s, pro_s), (anti_s, anti_s)),
                                  ((pro_s, pro_s), (anti_s, anti_s))))}
+    style_dict = {'t':np.array((pro_s,)),
+                  'st':np.array((pro_s, anti_s)),
+                  'pt':np.array((pro_s, anti_s))}
     dim_dict = {'t':0, 'st':1, 'pt':1}
+    avg_ax = {'t':(0, 1, 2), 'st':(0, 1), 'pt':(0, 2)}
     signif_h_dict = {'t':0, 'st':-4.5, 'pt':-2}
     if 'c' in gen_panels:
         for m, dpca_out in data['cd'].items():
@@ -1183,23 +1191,21 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                 pl.plot_dpca_kernels(dpcas[0], xs, ax_keys, dim_dict=dim_dict,
                                      signif_level=signif_level,
                                      color_dict=color_dict, style_dict=style_dict,
-                                     signif_heights=signif_h_dict)
+                                     signif_heights=signif_h_dict,
+                                     avg_ax=avg_ax)
 
-        comb_time_yscale = 10
-        comb_sacc_yscale = 10
-        comb_match_yscale = 2
+        comb_time_yscale = 8
+        comb_sacc_yscale = 2
+        comb_match_yscale = .5
         gpl.make_yaxis_scale_bar(time_comb_ax, magnitude=comb_time_yscale)
         gpl.make_yaxis_scale_bar(sacc_comb_ax, label='normalized firing rate',
                                  magnitude=comb_sacc_yscale, text_buff=.19)
-        gpl.make_yaxis_scale_bar(match_comb_ax, magnitude=comb_match_yscale)
                 
-        comb_time_xscale = 20
+        comb_time_xscale = 10
         comb_sacc_xscale = 5
-        comb_match_xscale = 2
+        comb_match_xscale = 4
         gpl.make_xaxis_scale_bar(time_comb_ax, magnitude=comb_time_xscale, label='')
         gpl.make_xaxis_scale_bar(sacc_comb_ax, magnitude=comb_sacc_xscale, label='')
-        gpl.make_xaxis_scale_bar(match_comb_ax, magnitude=comb_match_xscale,
-                                 label='normalized firing rate')
 
         # gpl.clean_plot_bottom(time_comb_ax)
         time_comb_ax.set_title('sDMST', loc='left')
@@ -1211,15 +1217,23 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                           transform=match_comb_ax.transAxes)
         # gpl.clean_plot_bottom(sacc_sdms_ax)
 
-    style_dict = {'bt':np.array(((pro_s, pro_s), (anti_s, anti_s))),
-                  'bst':np.array(((pro_s, anti_s), (pro_s, anti_s))),
-                  'bpt':np.array(((pro_s, pro_s), (anti_s, anti_s)))}
+    # style_dict = {'bt':np.array(((pro_s, pro_s), (anti_s, anti_s))),
+    #               'bst':np.array(((pro_s, anti_s), (pro_s, anti_s))),
+    #               'bpt':np.array(((pro_s, pro_s), (anti_s, anti_s)))}
+    style_dict = {'bt':np.array((pro_s,)),
+                  'bst':np.array((pro_s, anti_s)),
+                  'bpt':np.array((pro_s, anti_s))}
+    avg_ax_task = {'bt':(0, 1), 'bst':(0,), 'bpt':(1,)}
+
     dim_dict = {'bt':0, 'bst':1, 'bpt':1}
     signif_h_dict = {'bt':0, 'bst':-4.6, 'bpt':-2}
     
-    time_sdms_ax = f.add_subplot(time_sdms_grid)
-    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid)
-    fam_sdms_ax = f.add_subplot(fam_sdms_grid)
+    time_sdms_ax = f.add_subplot(time_sdms_grid, sharey=time_comb_ax,
+                                 sharex=time_comb_ax)
+    sacc_sdms_ax = f.add_subplot(sacc_sdms_grid, sharey=sacc_comb_ax,
+                                 sharex=sacc_comb_ax)
+    fam_sdms_ax = f.add_subplot(fam_sdms_grid, sharey=match_comb_ax,
+                                sharex=match_comb_ax)
     color_dict = {'bt':sdms_tc, 'bst':sdms_sc, 'bpt':sdms_mc}
     ax_keys = (('bt', time_sdms_ax), ('bst', sacc_sdms_ax), ('bpt', fam_sdms_ax))
     task_ind_sdms = 0                    
@@ -1231,19 +1245,19 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                      signif_level=signif_level,
                                      color_dict=color_dict, style_dict=style_dict,
                                      signif_heights=signif_h_dict,
-                                     task_ind=task_ind_sdms)
+                                     task_ind=task_ind_sdms, avg_ax=avg_ax_task)
 
-        task_time_yscale = 5
-        task_sacc_yscale = 2
-        task_match_yscale = 1
-        gpl.make_yaxis_scale_bar(time_sdms_ax, magnitude=task_time_yscale)
-        gpl.make_yaxis_scale_bar(sacc_sdms_ax, label='normalized firing rate',
-                                 magnitude=task_sacc_yscale, text_buff=.19)
-        gpl.make_yaxis_scale_bar(fam_sdms_ax, magnitude=task_match_yscale)
+        task_time_yscale = comb_time_yscale
+        task_sacc_yscale = comb_sacc_yscale
+        task_match_yscale = comb_match_yscale
+        # gpl.make_yaxis_scale_bar(time_sdms_ax, magnitude=task_time_yscale)
+        #gpl.make_yaxis_scale_bar(sacc_sdms_ax, 
+        #                           magnitude=task_sacc_yscale, text_buff=.19)
+        # gpl.make_yaxis_scale_bar(fam_sdms_ax, magnitude=task_match_yscale)
 
-        task_time_xscale = 5
-        task_sacc_xscale = 2
-        task_match_xscale = 2
+        task_time_xscale = comb_time_xscale
+        task_sacc_xscale = comb_sacc_xscale
+        task_match_xscale = comb_match_xscale
         gpl.make_xaxis_scale_bar(time_sdms_ax, magnitude=task_time_xscale,
                                  label='')
         gpl.make_xaxis_scale_bar(sacc_sdms_ax, magnitude=task_sacc_xscale,
@@ -1285,7 +1299,7 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                      signif_level=signif_level,
                                      color_dict=color_dict, style_dict=style_dict,
                                      signif_heights=signif_h_dict,
-                                     task_ind=task_ind_plt)
+                                     task_ind=task_ind_plt, avg_ax=avg_ax_task)
                 
         gpl.make_xaxis_scale_bar(time_plt_ax, magnitude=task_time_xscale,
                                  label='')
@@ -1313,6 +1327,10 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
         fam_plt_ax.legend(handles=(pro_mleg, anti_mleg), frameon=False,
                            loc='upper left')
 
+    gpl.make_xaxis_scale_bar(match_comb_ax, magnitude=comb_match_xscale,
+                             label='normalized firing rate')
+    gpl.make_yaxis_scale_bar(match_comb_ax, magnitude=comb_match_yscale)
+
     offset = .05
     full_ev_ax = f.add_subplot(full_ev_grid)
     sacc_latency_ax = f.add_subplot(sacc_latency_grid, sharex=full_ev_ax)
@@ -1321,7 +1339,7 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
     plt_cent = .5
     if 'e' in gen_panels:
         p_temp = '{}: {:.2f} ms {} encoding latency, {}'
-        for i, (m, dpca_out) in enumerate(data['c'].items()):
+        for i, (m, dpca_out) in enumerate(data['cd'].items()):
             _, dpcas_sdms, xs = dpca_out
             ev_sdms = pl.compute_dpca_ev(dpcas_sdms)*100
             
@@ -1341,7 +1359,7 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                     color=monkey_colors[m])
                 
                 print(p_temp.format(m, sacc_lat_mean, 'sacc', 'sDMST'))
-            sdms_match_lat = pl.compute_dpca_latencies(dpcas_sdms, xs, 'mt')
+            sdms_match_lat = pl.compute_dpca_latencies(dpcas_sdms, xs, 'pt')
             if not np.all(np.isnan(sdms_match_lat)):
                 # match_latency_ax.hist(sdms_match_lat, density=True, color=sdms_mc,
                 # histtype='step')
@@ -1351,7 +1369,7 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                     ax=match_latency_ax, color=monkey_colors[m])
                 print(p_temp.format(m, match_lat_mean, 'match', 'sDMST'))
                 
-        for i, (m, dpca_out) in enumerate(data['d'].items()):
+        for i, (m, dpca_out) in enumerate(data['cd'].items()):
             _, dpcas_plt, xs = dpca_out
             ev_plt = pl.compute_dpca_ev(dpcas_plt)*100
             print('{}: {:.2f}% variance explained, {}'.format(m, ev_plt[0]*100,
@@ -1359,7 +1377,6 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
             x_val = [plt_cent - offset + 2*offset*i]
             gpl.plot_trace_werr(x_val, ev_plt, points=True,
                                 color=monkey_colors[m], ax=full_ev_ax)
-
             plt_sacc_lat = pl.compute_dpca_latencies(dpcas_plt, xs, 'st')
             if not np.all(np.isnan(plt_sacc_lat)):
                 # sacc_latency_ax.hist(plt_sacc_lat, density=True, color=plt_sc,
@@ -1369,7 +1386,7 @@ def figure4(data=None, gen_panels=None, exper_data=None, plot_monkey='Rufus',
                                     points=True, color=monkey_colors[m])
                 sacc_lat_mean = np.nanmean(plt_sacc_lat)
                 print(p_temp.format(m, sacc_lat_mean, 'sacc', 'PLT'))
-            plt_fam_lat = pl.compute_dpca_latencies(dpcas_plt, xs, 'ft')
+            plt_fam_lat = pl.compute_dpca_latencies(dpcas_plt, xs, 'pt')
             if not np.all(np.isnan(plt_fam_lat)):
                 # match_latency_ax.hist(plt_fam_lat, density=True, color=plt_fc,
                 #                       histtype='step')
