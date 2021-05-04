@@ -30,6 +30,8 @@ def create_parser():
                         nargs='+', help='figures to generate')
     parser.add_argument('--config_path', default=default_config, type=str,
                         help='path to config file')
+    parser.add_argument('--reverse_priority', default=False, action='store_true',
+                        help='reverse priority between the two tasks')
     return parser
 
 def make_monkey_paths(mps):
@@ -56,8 +58,13 @@ if __name__ == '__main__':
     else:
         fig_data = {}
 
-    fig_funcs = {'1':fsp.figure1, '2':fsp.figure2, '2a':fsp.figure2a,
-                 '3':fsp.figure3, '4':fsp.figure4, '5':fsp.figure5,
+    fig_funcs = {'1':fsp.figure1, '2':fsp.figure2,
+                 '2a':ft.partial(fsp.figure2a,
+                                 reverse_priority=args.reverse_priority),
+                 '3':fsp.figure3,
+                 '4':ft.partial(fsp.figure4,
+                                reverse_priority=args.reverse_priority),
+                 '5':fsp.figure5,
                  '6':fsp.figure6, 'si-spatial':fsp.figure_si_spatial,
                  'si-bhv':fsp.figure_si_bhv, 'si-sal':fsp.figure_si_sal}
 
