@@ -601,7 +601,7 @@ def figure2(data=None, gen_panels=None, exper_data=None,
 def figure2a(data=None, gen_panels=None, exper_data=None,
              monkey_paths=pl.monkey_paths, config_file=config_path,
              rand_eg=False, bf=None, reverse_priority=False,
-             max_fit=np.inf):
+             max_fit=np.inf, no_plot=False):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -691,7 +691,7 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     # find good way to plot model comparison result
     monkey_offsets = {'Neville':.1,
                       'Rufus':-.1}
-    if 'cd' in gen_panels:
+    if 'cd' in gen_panels and not no_plot:
         neurs = data['cd']
         loss_ax = f.add_subplot(loss_gs)
         sacc_ax = f.add_subplot(sacc_gs)
