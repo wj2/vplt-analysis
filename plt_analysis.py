@@ -539,7 +539,7 @@ def _get_rel_loss(cf, model_name, deviance='d_loo', deviance_uncertainty='dse'):
         pl = pl/cf.loc[model_name, deviance_uncertainty]
     return pl
 
-def get_label_samps(params, k, labels, samples_key):
+def get_label_samps(params, k, labels, samples_key='beta'):
     k_ind = labels.index(k)
     samps = params.samples[samples_key][:, k_ind]
     return samps
@@ -616,6 +616,29 @@ def summarize_model_comparison(
             tmdelt_sec = get_label_diff(nonl_params, (('task', 1),),
                                         (('task', 0),), sec_conds)
 
+            plt_mean = get_label_samps(nonl_params, (('task', 1),),
+                                       sec_conds)
+            sdms_mean = get_label_samps(nonl_params, (('task', 0),),
+                                        sec_conds)
+
+            sacc_prior0 = get_label_diff(nonl_params,
+                                         (('priority', 0), ('sacc', 1)),
+                                         (('priority', 0), ('sacc', 0)),
+                                         sec_conds)
+            sacc_prior1 = get_label_diff(nonl_params,
+                                         (('priority', 1), ('sacc', 1)),
+                                         (('priority', 1), ('sacc', 0)),
+                                         sec_conds)
+
+            prior_sacc0 = get_label_diff(nonl_params,
+                                         (('priority', 1), ('sacc', 0)),
+                                         (('priority', 0), ('sacc', 0)),
+                                         sec_conds)
+            prior_sacc1 = get_label_diff(nonl_params,
+                                         (('priority', 1), ('sacc', 1)),
+                                         (('priority', 0), ('sacc', 1)),
+                                         sec_conds)
+
             sacc_plt = get_label_diff(nonl_params,
                                       (('task', 1), ('sacc', 1)),
                                       (('task', 1), ('sacc', 0)),
@@ -644,11 +667,15 @@ def summarize_model_comparison(
             mean_deltas.append((ct(tmdelt_modu),
                                 ct(tmdelt_sec)))
             nonl_sacc.append((ct(sacc_gen),
-                              ct(sacc_plt + sacc_gen),
-                              ct(sacc_sdms + sacc_gen)))
+                              ct(sacc_plt + sacc_gen + .5*sacc_prior0
+                                 + .5*sacc_prior1),
+                              ct(sacc_sdms + sacc_gen + .5*sacc_prior0
+                                 + .5*sacc_prior1)))
             nonl_prior.append((ct(prior_gen),
-                               ct(prior_plt + prior_gen),
-                               ct(prior_sdms + prior_gen)))
+                               ct(prior_plt + prior_gen + .5*prior_sacc0
+                                  + .5*prior_sacc1),
+                               ct(prior_sdms + prior_gen + .5*prior_sacc0
+                                  + .5*prior_sacc1)))
             out_mods.append(mods_i)
             for mn in model_names:
                 mnl = out_loss.get(mn, [])
@@ -724,11 +751,23 @@ def plot_model_comparison(loss, metrics, axs=None,
                                  label='fraction best fit',
                                  text_buff=.25)
 
-    ax_sacc.hist(metrics['sacc_nonl'][:,0], histtype='step', color=color)
+    # ax_sacc.hist(metrics['sacc_nonl'][:,0], histtype='step', color=color)
+    ax_sacc.hist(metrics['sigma'][:,1], histtype='step', color=color)
     ax_prior.hist(metrics['prior_nonl'][:,0], histtype='step', color=color)
+    gpl.print_mean_conf95(metrics['sigma'][:, 1], monkey_name,
+                          'sigma change magnitude',
+                          func=np.median)
     gpl.print_mean_conf95(metrics['sacc_nonl'][:, 0], monkey_name,
                           'general saccade magnitude',
-                          func=lambda x: np.mean(np.abs(x)))
+                          func=np.median)
+    gpl.print_mean_conf95(metrics['sacc_nonl'][:, 1]
+                          - metrics['sacc_nonl'][:, 0], monkey_name,
+                          'task saccade magnitude',
+                          func=np.mean)
+    gpl.print_mean_conf95(metrics['sacc_nonl'][:, 2]
+                          - metrics['sacc_nonl'][:, 0], monkey_name,
+                          'task saccade magnitude',
+                          func=np.mean)
     gpl.print_mean_conf95(metrics['prior_nonl'][:, 0], monkey_name,
                           'general priority magnitude',
                           func=lambda x: np.mean(np.abs(x)))
@@ -1417,19 +1456,26 @@ def plot_single_unit_eg(ns, xs, neur_key, labels, colors=None, linestyles=None,
     return ax
 
 def plot_decoding_info(decs, pt, ax1, ax2, colors=None,
-                       pb_color=(.4, .4, .4), pb_width=2):
+                       pb_color=(.4, .4, .4), pb_width=2,
+                       ax_dict=False):
     pts_all = {}
     for i, (m, res) in enumerate(decs.items()):
-        plot_svm_decoding(res[1], res[2], ax=ax1, colordict=colors)
-        gpl.add_vlines(0, ax1)
-        gpl.add_hlines(.5, ax1, linestyle='dashed')
-        gpl.add_hlines(.5, ax2, linestyle='dashed')
-        _, pts, x_ind = plot_svm_decoding_point(res[1], res[2], pt, ax=ax2,
+        if ax_dict:
+            ax1_m = ax1[m]
+            ax2_m = ax2[m]
+        else:
+            ax1_m = ax1
+            ax2_m = ax2
+        plot_svm_decoding(res[1], res[2], ax=ax1_m, colordict=colors)
+        gpl.add_vlines(0, ax1_m)
+        gpl.add_hlines(.5, ax1_m, linestyle='dashed')
+        gpl.add_hlines(.5, ax2_m, linestyle='dashed')
+        _, pts, x_ind = plot_svm_decoding_point(res[1], res[2], pt, ax=ax2_m,
                                                 legend=False, colordict=colors,
                                                 pb_color=pb_color,
-                                                pb_width=pb_width, pb_ax=ax1)
+                                                pb_width=pb_width, pb_ax=ax1_m)
         pts_all[m] = pts
-        gpl.clean_plot(ax2, 1)
+        gpl.clean_plot(ax2_m, 1)
     return pts_all
 
 def plot_svm_bhv_scatter(decs_pop, bias_dict, pt, ax1, ax2, low_lim=.4,
@@ -1643,6 +1689,83 @@ def decode_task_from_eyepos(eps1, ts1, eps2, ts2, pretime, posttime,
                       n_folds, shuffle=True, params=params)
     return out
 
+def organize_dpca(data, dfunc_group, mf, start, end, binsize,
+                  binstep, min_trials, cond_labels,
+                  dfunc_pts, min_spks=5, shuff_labels=False,
+                  pop=False, causal_timing=True, min_population=1,
+                  use_avail_trials=False, use_max_trials=False,
+                  **kwargs):
+    mfs = (mf,)*len(dfunc_group)
+    if pop:
+        out = na.organize_spiking_data_pop(data, dfunc_group, mfs,
+                                           start, end, binsize,
+                                           binstep=binstep,
+                                           min_trials=min_trials,
+                                           min_spks=None, 
+                                           causal_timing=causal_timing,
+                                           **kwargs)
+    else:
+        out = na.organize_spiking_data(data, dfunc_group, mfs,
+                                       start, end, binsize, binstep=binstep,
+                                       min_trials=min_trials,
+                                       min_spks=min_spks, 
+                                       causal_timing=causal_timing,
+                                       **kwargs)
+    dat, xs = out
+    dfunc_maxes = np.max(dfunc_pts, axis=0) + 1
+    if use_avail_trials:
+        all_mins = {k:np.inf for k in dat[0].keys()}
+        all_maxes = {k:0 for k in dat[0].keys()}
+        for d in dat:
+            all_mins = {k:min(all_mins[k], len(d[k])) for k in d.keys()}
+            all_maxes = {k:max(all_maxes[k], len(d[k])) for k in d.keys()}
+        min_trials = np.min(list(all_mins.values()))
+        max_trials = np.max(list(all_maxes.values()))
+    orgs = {}
+    if pop:
+        for k in dat[0].keys():
+            org = np.zeros(dfunc_maxes, dtype=object)
+            for i, dp in enumerate(dfunc_pts):
+                org[dp] = dat[i][k]
+            orgs[k] = org
+    else:
+        org = np.zeros(dfunc_maxes, dtype=object)
+        for i, dp in enumerate(dfunc_pts):
+            org[dp] = dat[i]
+        orgs['all'] = org
+    return orgs, xs
+
+def fit_dpca(orgs, resample=100, with_replace=False):    
+    dpca_fits = {}
+    for k, org in orgs.items():
+        fits = []
+        print('{}: {} neurons'.format(k, len(org[0, 0, 0])))
+        for i in range(resample):
+            if use_max_trials:
+                trls = max_trials
+                fill_nan = True
+            else:
+                trls = min_trials
+                fill_nan = False
+            arr_form_i = na.array_format(org, trls, fill_nan=fill_nan,
+                                         with_replace=with_replace)
+            print('{} / {}'.format(i+1, resample))
+            arr_form_i = np.moveaxis(arr_form_i, 2, -1)
+            arr_form_mean = np.nanmean(arr_form_i, axis=0)
+            with u.HiddenPrints():
+                d_ = dPCA.dPCA(cond_labels, regularizer='auto')
+                d_.protect = ['t']
+                d_fit = d_.fit_transform(arr_form_mean, trialX=arr_form_i)
+                out = d_.significance_analysis(arr_form_mean, arr_form_i,
+                                               axis=True, full=True)
+                s_mask, scores, shuff_scores = out
+                ev = d_.explained_variance_ratio_
+            fits.append((d_fit, s_mask, scores, shuff_scores, ev))
+        dpca_fits[k] = fits
+    if not pop:
+        dpca_fits = dpca_fits['all']
+    return orgs, dpca_fits, xs
+
 def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
                             binstep, min_trials, cond_labels,
                             dfunc_pts, min_spks=5, resample=100,
@@ -1688,6 +1811,7 @@ def organize_dpca_transform(data, dfunc_group, mf, start, end, binsize,
         for i, dp in enumerate(dfunc_pts):
             org[dp] = dat[i]
         orgs['all'] = org
+
     dpca_fits = {}
     for k, org in orgs.items():
         fits = []
@@ -1899,7 +2023,9 @@ def organize_svm_pairs_prelim(data, dfunc_group, mf, start, end, binsize,
     if len(dfunc_group) > 2 and dfunc_pairs is None:
         dfunc_pairs = tuple(int(np.floor(i/2)) for i in range(2*num_pairs))
     if cross_dec:
-        org_min_trials = min_trials
+        dfp = np.array(dfunc_pairs)
+        org_min_trials = tuple(4*min_trials/np.sum(dfp == x)
+                               for x in dfunc_pairs)
     else:
         dfp = np.array(dfunc_pairs)
         org_min_trials = tuple(2*min_trials/np.sum(dfp == x)
@@ -1913,6 +2039,7 @@ def organize_svm_pairs_prelim(data, dfunc_group, mf, start, end, binsize,
         mfs = (mf,)*len(dfunc_group)
     else:
         mfs = mf
+        assert len(mfs) == len(dfunc_group)
     ctzs = collapse_time_zscore
     if pop:
         out = na.organize_spiking_data_pop(data, dfunc_group, mfs,
@@ -1956,13 +2083,16 @@ def organized_decoding(dat, dfunc_pairs, cond_labels, require_trials=20,
                                   use_avail_trials=use_avail_trials,
                                   equal_fold=equal_fold, norm=norm,
                                   collapse_time=collapse_time,
-                                  min_population=min_population)
+                                  min_population=min_population,
+                                  reduce_required=False)
             dec[cond_labels[i]] = out
         else:
             d1_label, d2_label = cond_labels[i]
             label1 = '{} -> {}'.format(d1_label, d2_label)
-            train_c1, test_c1 = c1
-            train_c2, test_c2 = c2
+            half_c1 = int(len(c1)/2)
+            half_c2 = int(len(c2)/2)
+            train_c1, test_c1 = c1[:half_c1], c1[half_c1:]
+            train_c2, test_c2 = c2[:half_c2], c2[half_c2:]
             out = na.svm_cross_decoding(train_c1, test_c1, train_c2, test_c2,
                                         require_trials=require_trials,
                                         resample=resample, leave_out=leave_out,
@@ -1972,7 +2102,8 @@ def organized_decoding(dat, dfunc_pairs, cond_labels, require_trials=20,
                                         with_replace=with_replace,
                                         equal_fold=equal_fold, norm=norm,
                                         collapse_time=collapse_time,
-                                        min_population=min_population)
+                                        min_population=min_population,
+                                        multi_cond=True)
             dec[label1] = out
             
             label2 = '{} -> {}'.format(d2_label, d1_label)
@@ -1984,7 +2115,8 @@ def organized_decoding(dat, dfunc_pairs, cond_labels, require_trials=20,
                                         with_replace=with_replace,
                                         equal_fold=equal_fold, norm=norm,
                                         collapse_time=collapse_time,
-                                        min_population=min_population)
+                                        min_population=min_population,
+                                        multi_cond=True)
             dec[label2] = out
     return dec, org
 

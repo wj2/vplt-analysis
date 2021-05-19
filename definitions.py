@@ -388,6 +388,64 @@ saccout_low_lum_close_n = u.make_trial_constraint_func(('trial_type', 'right_fir
                                               np.equal))
 
 
+saccout_novout = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_r, nn_plt_r), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+saccout_famout = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((nf_plt_r, ff_plt_r), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+saccin_novout = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_r, nn_plt_r), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+saccin_famout = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((nf_plt_r, ff_plt_r), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+
+saccout_novout_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_n, nn_plt_n), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+saccout_famout_n = u.make_trial_constraint_func(('trial_type', 'right_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((nf_plt_n, ff_plt_n), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+saccin_novout_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((fn_plt_n, nn_plt_n), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+saccin_famout_n = u.make_trial_constraint_func(('trial_type', 'left_first',
+                                             'angular_separation',
+                                             'TrialError'),
+                                            ((nf_plt_n, ff_plt_n), True, 180,
+                                             0),
+                                              (np.isin, np.equal, np.equal,
+                                               np.equal))
+
 novin_saccin = u.make_trial_constraint_func(('trial_type', 'left_first',
                                              'angular_separation',
                                              'TrialError'),
@@ -1060,7 +1118,6 @@ fix_on_func = u.make_time_field_func('fixation_on')
 first_sacc_func = u.make_time_field_func('first_sacc_time')
 img_off_func_incorr = u.make_time_field_func('test_array_off')
 img_off_func_corr = u.make_time_field_func('test_array_off', offset=-400)
-
 
 # Parameter collections
 eye_params = {}
