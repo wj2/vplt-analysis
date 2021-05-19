@@ -721,7 +721,8 @@ def figure2a(data=None, gen_panels=None, exper_data=None,
     return data    
 
 def figure3(data=None, gen_panels=None, exper_data=None,
-            monkey_paths=pl.monkey_paths, config_file=config_path, bf=None):
+            monkey_paths=pl.monkey_paths, config_file=config_path, bf=None,
+            priority_comb=False, img_offset=False):
     setup()
     cf = u.ConfigParserColor()
     cf.read(config_file)
@@ -729,30 +730,34 @@ def figure3(data=None, gen_panels=None, exper_data=None,
     if exper_data is None:
         exper_data = load_all_data(monkey_paths)
     if gen_panels is None:
-        gen_panels = ('ab', 'c', 'de', 'e', 'f')
+        gen_panels = ('ab', 'c', 'de', 'e', 'f', 'g')
     if data is None:
         data = {}
 
-    fsize = (4.5, 4.5)
+    fsize = (4.5, 7.5)
     f = plt.figure(figsize=fsize)
     gs = f.add_gridspec(100, 100)
 
-    sacc_dec_grid = gs[:32, :50]
-    sacc_pt_grid = gs[:32, 50:55]
+    sacc_dec_grid = gs[:24, :50]
+    sacc_pt_grid = gs[:24, 50:55]
 
-    sacc_scatter_grid = gs[:28, 70:]
+    sacc_scatter_grid = gs[:20, 70:]
     
-    sacc_cross_grid = gs[34:65, :50]
-    sacc_cross_pt_grid = gs[34:65, 50:55]
+    sacc_cross_grid = gs[26:49, :50]
+    sacc_cross_pt_grid = gs[26:49, 50:55]
     
-    dec_bhv_plt_grid = gs[38:60, 70:84]
-    dec_bhv_sdmst_grid = gs[38:60, 86:]
+    dec_bhv_plt_grid = gs[28:45, 70:84]
+    dec_bhv_sdmst_grid = gs[28:45, 86:]
 
-    match_dec_grid = gs[67:, :50]
-    match_pt_grid = gs[67:, 50:55]
+    match_dec_grid = gs[51:74, :50]
+    match_pt_grid = gs[51:74, 50:55]
+    match_scatter_grid = gs[55:70, 70:]
 
-    match_scatter_grid = gs[72:, 70:]
-    
+    prior_cross_m1_grid = gs[76:, :40]
+    prior_cross_pt_m1_grid = gs[76:, 40:45]
+    prior_cross_m2_grid = gs[76:, 55:95]
+    prior_cross_pt_m2_grid = gs[76:, 95:]
+
     # names
     sdms_name = params.get('sdms_name')
     plt_name = params.get('plt_name')
@@ -904,7 +909,7 @@ def figure3(data=None, gen_panels=None, exper_data=None,
     dfunc_group['Neville'] = (d.saccin_sdms_n, d.saccin_plt_n,
                               d.saccout_sdms_n, d.saccout_plt_n)
     kernel = params.get('kernel_cross')
-    zscore = params.getboolean('zscore')
+    zscore_cross = params.getboolean('zscore_cross')
     equal_fold = params.getboolean('equal_fold')
 
     dfunc_pairs = (0, 0, 0, 0)
@@ -914,7 +919,7 @@ def figure3(data=None, gen_panels=None, exper_data=None,
         for m, mdata in exper_data.items():
             out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
                                                start, end, binsize, binstep,
-                                               min_trials, zscore=zscore,
+                                               min_trials, zscore=zscore_cross,
                                                cond_labels=cond_labels,
                                                min_spks=min_spks,
                                                cross_dec=True,
@@ -923,7 +928,7 @@ def figure3(data=None, gen_panels=None, exper_data=None,
         if combine_monkeys:
             org_data = pl.combine_svm_format(org_data)
         decs = {}
-        if zscore:
+        if zscore_cross:
             norm = False
         else:
             norm = True
@@ -960,27 +965,60 @@ def figure3(data=None, gen_panels=None, exper_data=None,
     mf = d.first_sacc_func
     
     dfunc_group = {}
-    dfunc_group['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
-                            d.saccin_nonmatch_g_sdms, d.saccout_nonmatch_sdms,
-                            d.novin_saccin, d.novin_saccout,
-                            d.famin_saccin, d.famin_saccout)
-    dfunc_group['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
-                              d.saccin_nonmatch_g_sdms_n,
-                              d.saccout_nonmatch_sdms_n,
-                              d.novin_saccin_n, d.novin_saccout_n,
-                              d.famin_saccin_n, d.famin_saccout_n)
+    if priority_comb:
+        dfunc_group['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+                                d.novin_saccin, d.novin_saccout,
+                                d.saccin_nonmatch_g_sdms, d.saccout_nonmatch_sdms,
+                                d.famin_saccin, d.famin_saccout,
+                                d.saccin_match_sdms, d.saccout_match_g_sdms,
+                                d.saccin_nonmatch_g_sdms, d.saccout_nonmatch_sdms,
+                                d.novin_saccin, d.novin_saccout,
+                                d.famin_saccin, d.famin_saccout)
+        dfunc_group['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
+                                  d.famin_saccin_n, d.famin_saccout_n,
+                                  d.saccin_nonmatch_g_sdms_n,
+                                  d.saccout_nonmatch_sdms_n,
+                                  d.novin_saccin_n, d.novin_saccout_n,
+                                  d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
+                                  d.saccin_nonmatch_g_sdms_n,
+                                  d.saccout_nonmatch_sdms_n,
+                                  d.novin_saccin_n, d.novin_saccout_n,
+                                  d.famin_saccin_n, d.famin_saccout_n)
+        dfunc_pairs = (0, 0, 0, 0, 0, 0, 0, 0,
+                       1, 1, 1, 1, 2, 2, 2, 2)
+        cond_labels = ('priority', 'match-nonmatch', 'novel-familiar')
+        color_dict = {cond_labels[0]:n_color,
+                      cond_labels[1]:sdms_mc,
+                      cond_labels[2]:plt_fc}
+    else:
+        dfunc_group['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+                                d.saccin_nonmatch_g_sdms, d.saccout_nonmatch_sdms,
+                                d.novin_saccin, d.novin_saccout,
+                                d.famin_saccin, d.famin_saccout)
+        dfunc_group['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
+                                  d.saccin_nonmatch_g_sdms_n,
+                                  d.saccout_nonmatch_sdms_n,
+                                  d.novin_saccin_n, d.novin_saccout_n,
+                                  d.famin_saccin_n, d.famin_saccout_n)
+        dfunc_pairs = (0, 0, 0, 0, 1, 1, 1, 1)
+        cond_labels = ('match-nonmatch', 'novel-familiar')
+        color_dict = {cond_labels[0]:sdms_mc,
+                      cond_labels[1]:plt_fc}
+    if img_offset:
+        mfs = (d.img_off_func_corr, d.img_off_func_incorr,
+               d.img_off_func_incorr, d.img_off_func_corr,
+               mf, mf, mf, mf)
+    else:
+        mfs = (mf,)*len(dfunc_pairs)
 
-    dfunc_pairs = (0, 0, 0, 0, 1, 1, 1, 1)
-    cond_labels = ('match-nonmatch', 'novel-familiar')
-    color_dict = {cond_labels[0]:sdms_mc, cond_labels[1]:plt_fc}
     if 'e' not in data.keys() and 'e' in gen_panels:
         org_data = {}
         for m, mdata in exper_data.items():
-            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mfs,
                                                start, end, binsize, binstep,
                                                min_trials, zscore=zscore,
                                                cond_labels=cond_labels,
-                                               min_spks=min_spks,
+                                               min_spks=min_spks, full_mfs=True,
                                                dfunc_pairs=dfunc_pairs)
             org_data[m] = out
         if combine_monkeys:
@@ -1046,6 +1084,81 @@ def figure3(data=None, gen_panels=None, exper_data=None,
         pl.print_svm_scatter(pts, 'match pop', combine=True)
         match_scatter_ax.set_xlabel('match-nonmatch decoding')
         match_scatter_ax.set_ylabel('novel-familiar decoding')
+
+    dfunc_group['Rufus'] = (d.saccin_match_sdms, d.saccout_match_g_sdms,
+                            d.novin_saccin, d.novin_saccout,
+                            d.saccin_nonmatch_g_sdms, d.saccout_nonmatch_sdms,
+                            d.famin_saccin, d.famin_saccout)
+    dfunc_group['Neville'] = (d.saccin_match_sdms_n, d.saccout_match_g_sdms_n,
+                              d.novin_saccin_n, d.novin_saccout_n,
+                              d.saccin_nonmatch_g_sdms_n,
+                              d.saccout_nonmatch_sdms_n,
+                              d.famin_saccin_n, d.famin_saccout_n)
+    kernel = params.get('kernel_cross')
+    zscore_cross = params.getboolean('zscore_cross')
+    equal_fold = params.getboolean('equal_fold')
+    combine_monkeys_cross = False
+
+    dfunc_pairs = (0, 0, 0, 0, 0, 0, 0, 0)
+    cond_labels = (('sDMST', 'PLT'),)
+    if 'g' not in data.keys() and 'g' in gen_panels:
+        org_data = {}
+        for m, mdata in exper_data.items():
+            out = pl.organize_svm_pairs_prelim(mdata[0], dfunc_group[m], mf,
+                                               start, end, binsize, binstep,
+                                               min_trials, zscore=zscore_cross,
+                                               cond_labels=cond_labels,
+                                               min_spks=min_spks,
+                                               cross_dec=True,
+                                               dfunc_pairs=dfunc_pairs)
+            org_data[m] = out
+        if combine_monkeys_cross:
+            org_data = pl.combine_svm_format(org_data)
+        decs = {}
+        if zscore_cross:
+            norm = False
+        else:
+            norm = True
+        for m, od in org_data.items():
+            (dat, xs), dfunc_pairs, cond_labels = od
+            dec, org = pl.organized_decoding(dat, dfunc_pairs, cond_labels,
+                                             require_trials=min_trials,
+                                             norm=norm, resample=resample,
+                                             leave_out=leave_out,
+                                             kernel=kernel, cross_dec=True,
+                                             equal_fold=equal_fold)
+            decs[m] = (org, dec, xs)
+        data['g'] = decs
+        
+    prior_cross_m1_ax = f.add_subplot(prior_cross_m1_grid,
+                                  sharey=match_dec_ax)
+    prior_cross_pt_m1_ax = f.add_subplot(prior_cross_pt_m1_grid,
+                                         sharey=prior_cross_m1_ax)
+    prior_cross_m2_ax = f.add_subplot(prior_cross_m2_grid,
+                                  sharey=prior_cross_m1_ax)
+    prior_cross_pt_m2_ax = f.add_subplot(prior_cross_pt_m2_grid,
+                                         sharey=prior_cross_m2_ax)
+    prior_cross_axs = {'Neville':prior_cross_m1_ax,
+                       'Rufus':prior_cross_m2_ax}
+    prior_cross_pt_axs = {'Neville':prior_cross_pt_m1_ax,
+                          'Rufus':prior_cross_pt_m2_ax}    
+    # sacc_cross_ang_ax = f.add_subplot(sacc_ang_grid)
+    check_pt = params.getfloat('check_pt')
+    color_dict_cross = {' -> '.join((plt_name, sdms_name)):sdms_sc,
+                        ' -> '.join((sdms_name, plt_name)):plt_sc}
+    if 'g' in gen_panels:
+        cdecs = data['g']
+        pl.print_decoding_info(cdecs)
+        pts = pl.plot_decoding_info(cdecs, check_pt, prior_cross_axs,
+                                    prior_cross_pt_axs, colors=color_dict_cross,
+                                    ax_dict=True)
+        pl.print_svm_decoding_diff(pts, 'priority cross, {}', cond_labels[0])
+        for k in prior_cross_axs.keys():
+            gpl.make_yaxis_scale_bar(prior_cross_axs[k], anchor=.5,
+                                     magnitude=.5, double=False,
+                                     label='decoding')
+            gpl.clean_plot_bottom(prior_cross_axs[k])
+            gpl.clean_plot_bottom(prior_cross_pt_axs[k])
         
     if bf is None:
         bf = params.get('basefolder')
