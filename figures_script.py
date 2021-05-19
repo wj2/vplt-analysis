@@ -79,7 +79,7 @@ if __name__ == '__main__':
     for gf in gen_figs:
         fig_data[gf] = fig_funcs[gf](exper_data=data, data=fig_data.get(gf),
                                      config_file=args.config_path,
-                                     bf=args.output_folder)
+                                     bf=args.output_folder, no_plot=True)
 
     out_datafile = os.path.join(args.output_folder, 'fig_data.pkl')
-    pickle.dump(fig_data, open(out_datafile, 'wb'))
+    pickle.dump((args, fig_data), open(out_datafile, 'wb'))
